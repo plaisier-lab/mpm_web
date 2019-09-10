@@ -1,0 +1,129 @@
+a {
+    font-weight: bold;
+}
+thead {
+    font-weight: bold;
+    background: #ccc;
+}
+th {
+    font-weight: bold;
+    background: #ccc;
+}
+.bs-callout {
+    padding: 20px;
+    margin: 20px 0;
+    border: 1px solid #eee;
+    border-left-width: 5px;
+    border-radius: 3px;
+}
+.bs-callout h4 {
+    margin-top: 0;
+    margin-bottom: 5px;
+}
+.bs-callout p:last-child {
+    margin-bottom: 0;
+}
+.bs-callout code {
+    border-radius: 3px;
+}
+.bs-callout+.bs-callout {
+    margin-top: -5px;
+}
+.panel-default {
+    border-color: #600;
+}
+.panel-default > .panel-heading {
+    border-color: #600;
+    background-color: #600;
+    color: #fff;
+}
+.bs-callout-default {
+    border-left-color: #600;
+}
+.bs-callout-default h4 {
+    color: #600;
+    font-weight: bold;
+}
+.bs-callout-primary {
+    border-left-color: #428bca;
+}
+.bs-callout-primary h4 {
+    color: #428bca;
+}
+.bs-callout-primary h3 {
+    color: #428bca;
+}
+.bs-callout-success {
+    border-left-color: #ff6600;
+}
+.bs-callout-success h3 {
+    color: #cc3300;
+}
+.bs-callout-success h4 {
+    color: #5cb85c;
+}
+.bs-callout-danger {
+    border-left-color: #d9534f;
+}
+.bs-callout-danger h4 {
+    color: #d9534f;
+}
+.bs-callout-warning {
+    border-left-color: #f0ad4e;
+}
+.bs-callout-warning h4 {
+    color: #f0ad4e;
+}
+.bs-callout-info {
+    border-left-color: #5bc0de;
+}
+.bs-callout-info h4 {
+    color: #5bc0de;
+}
+/* column container */
+.colmask {
+	position:relative;	/* This fixes the IE7 overflow hidden bug */
+	clear:both;
+	float:left;
+	width:100%;			/* width of whole page */
+	overflow:hidden;		/* This chops off any overhanging divs */
+}
+/* common column settings */
+.colright,
+.colmid,
+.colleft {
+	float:left;
+	width:100%;			/* width of page */
+	position:relative;
+}
+.col1,
+.col2,
+.col3 {
+	float:left;
+	position:relative;
+	padding:0 0 1em 0;	/* no left and right padding on columns, we just make them narrower instead 
+					only padding top and bottom is included here, make it whatever value you need */
+	overflow:hidden;
+}
+/* 3 Column settings */
+.threecol .colmid {
+	right:8%;
+	background:#ffffff;
+}
+.threecol .colleft {
+	right:84%;
+	/* background:#ffffff; */
+}
+.threecol .col1 {
+	width:80%;			/* width of center column content (column width minus padding on either side) */
+	left:102%;			/* 100% plus left padding of center column */
+}
+.threecol .col2 {
+	width:4%;			/* Width of left column content (column width minus padding on either side) */
+	left:18%;			/* width of (right column) plus (center column left and right padding) plus (left column left padding) */
+}
+.threecol .col3 {
+	width:4%;			/* Width of right column content (column width minus padding on either side) */
+	left:102%;			/* Please make note of the brackets here:
+					(100% - left column width) plus (center column left and right padding) plus (left column left and right padding) plus (right column left padding) */
+}

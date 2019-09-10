@@ -1,0 +1,88 @@
+<!doctype html>
+<html>
+  <head>
+    {% block head %}
+    <script>
+       (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+         (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+         m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+         })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+       ga('create', 'UA-78238083-1', 'auto');
+       ga('send', 'pageview');
+    </script>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- The above 3 meta tags *must* come first in the head; any other head content must come *after* these tags -->
+    <meta name="google-signin-client_id" content="75692667349-39hlipha81a3v40du06184k75ajl8u4u.apps.googleusercontent.com">
+    <title>{% block title %}{% endblock %} - gbmSYGNAL TRN</title>
+    <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}">
+
+    <!-- Javascript -->
+    <script type="text/javascript" src="http://code.jquery.com/jquery-2.2.0.js"></script>
+    <script type="text/javascript" src="http://code.jquery.com/ui/1.11.4/jquery-ui.js"></script>
+    <script src="http://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js"></script>
+
+    <!-- CSS -->
+    <link rel="stylesheet" href="http://code.jquery.com/ui/1.11.4/themes/ui-lightness/jquery-ui.css">
+    <link rel="stylesheet" href="http://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css">
+    <link rel="stylesheet" href="/static/css/overrides.css" media="all">
+    <link rel="stylesheet" href="/static/css/main.css" media="all">
+    {% endblock %}
+    {% block scripts %}{% endblock %}
+  </head>
+  <body>
+    <nav class="navbar navbar-default navbar-fixed-top">
+      <div class="container-fluid">
+        <div class="navbar-header">
+          <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar">
+            <span class="sr-only">Toggle navigation</span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+          </button>
+          <a class="navbar-brand" href="{{url_for('index')}}" title="To start page"><img alt="Logo" class="logo" style="width:100px;" src="/static/images/small.png"></a>
+        </div>
+        <div id="navbar" class="collapse navbar-collapse">
+          <ul class="nav navbar-nav">
+            <li><a href="/" title="Explore the mpmSYGNAL network flows"><span class="glyphicon glyphicon-certificate"></span> mpmSYGNAL Network</a></li>
+            <li><a href="{{url_for('combinatorial_network')}}" title="Explore combinatorial regulatory network"><span class="glyphicon glyphicon-asterisk"></span> Combinatorial Network</a></li>
+            <li><a href="{{url_for('about')}}" title="About the gbmSYGNAL TRN"><span class="glyphicon glyphicon-info-sign"></span> About</a></li>
+            <li><a href="{{url_for('download')}}" title="Download the gbmSYGNAL TRN"><span class="glyphicon glyphicon-download"></span> Download</a></li>
+          </ul>
+        </div><!--/.nav-collapse -->
+      </div>
+    </nav>
+    <div class='colmask threecol'>
+        <div class='colmid'>
+            <div class='colleft'>
+                <div class='col1'>
+                    {% block content %}
+                    {% endblock %}
+                    <!-- Column 1 end -->
+                </div>
+                <div class='col2'>
+                    <!-- Column 2 start -->
+                    {% block content_col2 %}
+                    {% endblock %}
+                    <!-- Column 2 end -->
+                </div>
+                <div class='col3'>
+                    <!-- Column 3 start -->
+                    {% block content_col3 %}
+                    {% endblock %}
+                    <!-- Column 3 end -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="footer">
+      <div class="container">
+          <div class='text-center'><a href='https://plaisierlab.engineering.asu.edu'>Plaisier Lab</a></br><a href='https://sbhse.engineering.asu.edu'>School of Biological and Health Systems Engineering</a><a href='https://sbhse.engineering.asu.edu/'><div class="text-muted"><img alt="Logo" class="logo" style="width:200px;" src="/static/images/asu_fultonengineering_horiz_rgb_maroongold_150ppi.png"><br><small>&copy; 2019 Arizona State University.</small></div></a></div>
+      </div>
+    <div class="container-fluid" style="margin-bottom: 20px;">
+    </footer>
+    {% block bottom %}{% endblock %}
+  </body>
+</html>
