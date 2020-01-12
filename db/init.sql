@@ -57,8 +57,8 @@ CREATE TABLE pheno_data (
     id integer unsigned NOT NULL AUTO_INCREMENT,
     phenotype_id integer unsigned,
     patient_id integer unsigned,
-    name varchar(50) not null,
-    long_name varchar(50),
+    phenotype_value float,
+    phenotype_string varchar(50),
     PRIMARY KEY (id),
     FOREIGN KEY (phenotype_id) REFERENCES phenotype (id),
     FOREIGN KEY (patient_id) REFERENCES patient (id)
@@ -104,11 +104,13 @@ CREATE TABLE bic_hal (
 CREATE TABLE tf_regulator (
     id integer unsigned NOT NULL AUTO_INCREMENT,
     bicluster_id integer unsigned,
-    gene_id integer unsigned,
-    action varchar(15),
+    tf_id integer unsigned,
+    /*action varchar(15),*/
+	r_value float(24, 24),
+	p_value float(24, 24),
     PRIMARY KEY (id),
     FOREIGN KEY (bicluster_id) REFERENCES bicluster (id),
-    FOREIGN KEY (gene_id) REFERENCES gene (id)
+    FOREIGN KEY (tf_id) REFERENCES gene (id)
 );
 
 CREATE TABLE tf_targets (
@@ -184,12 +186,22 @@ CREATE TABLE go_gene (
     FOREIGN KEY (gene_id) REFERENCES gene (id)
 );
 
+CREATE TABLE locus (
+    id integer unsigned NOT NULL AUTO_INCREMENT,
+    locus_name varchar(10),
+    mutation_type varchar(10),
+    PRIMARY KEY (id)
+);
+
 CREATE TABLE somatic_mutation (
     id integer unsigned NOT NULL AUTO_INCREMENT,
-    ext_id integer,
-    mutation_type varchar(10),
+    ext_id integer null,
+    mutation_type varchar(10) null,
+    locus_id integer unsigned null,
     PRIMARY KEY (id),
-    KEY idx_ext_id (ext_id)
+    KEY idx_ext_id (ext_id),
+
+    FOREIGN KEY (locus_id) REFERENCES locus (id)
 );
 
 CREATE TABLE causal_flow (

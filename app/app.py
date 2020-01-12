@@ -45,20 +45,39 @@ NUM_PARTS = 5
 
 convert = {'Evading apoptosis':'cellDeath.gif', 'Evading immune detection':'avoidImmuneDestruction.gif', 'Genome instability and mutation':'genomicInstability.gif', 'Insensitivity to antigrowth signals':'evadeGrowthSuppressors.gif', 'Limitless replicative potential':'immortality.gif', 'Reprogramming energy metabolism':'cellularEnergetics.gif', 'Self sufficiency in growth signals':'sustainedProliferativeSignalling.gif', 'Sustained angiogenesis':'angiogenesis.gif', 'Tissue invasion and metastasis':'invasion.gif', 'Tumor promoting inflammation':'promotingInflammation.gif'}
 
+import os
+print(os.getcwd())
+
 app = Flask(__name__)
-#app.config.from_envvar('GLIOMA_SETTINGS')
+# app.config.from_envvar('MESO_SETTINGS')
 
 ######################################################################
 #### General helpers
 ######################################################################
 
 def dbconn():
+    '''
+    'user': app.config['USER'],
+    'password': app.config['PASS'],
+    'host': app.config['HOST'],
+    'port': app.config['port'],
+    'database': app.config['DB'],
+    '''
+
+    '''
+    'user': "root",
+    'password': "root",
+    'host': "db",
+    'port': "3306",
+    'database': "mpm_web",
+    '''
+    
     config = {
-        'user': app.config['USER'],
-        'password': app.config['PASS'],
-        'host': app.config['HOST'],
-        'port': app.config['port'],
-        'database': app.config['DB']
+        'user': "root",
+        'password': "root",
+        'host': "db",
+        'port': "3306",
+        'database': "mpm_web",
     }
     return mysql.connector.connect(**config)
 
