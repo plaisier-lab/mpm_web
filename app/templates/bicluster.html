@@ -129,15 +129,14 @@
           showInLegend: false,
           colorByPoint: true,
           data: {{js_boxplot_data|safe}},
-          colors: {{boxplot_colors|safe}}
+          colors: {{boxplot_colors|safe}},
+          fillColors: {{boxplot_colors|safe}},
           },
-          { name: 'Normal Brain', color: '#6abd45'},
-          { name: 'Classical', color: 'black'},
-          { name: 'Neural', color: '#32689b'},
-          { name: 'G-CIMP', color: '#8a171a'},
-          { name: 'Proneural', color: '#ed2024'},
-          { name: 'Mesenchymal', color: '#faa41a'},
-          { name: 'NA', color: 'grey'}
+          { name: 'Sarcomatoid', color: '#2c6dd4'},
+          { name: 'Epithelioid', color: '#8a171a'},
+          { name: 'Desmoplastic', color: '#ed2024'},
+          { name: 'Biphasic', color: '#faa41a'},
+          { name: 'NA', color: '#ed2024'},
           ]
       });
       $('#enrichment-graph').highcharts({

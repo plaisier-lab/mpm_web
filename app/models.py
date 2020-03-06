@@ -69,14 +69,14 @@ class Bicluster(db.Model):
     survival = db.Column(db.Float)
     survival_p_value = db.Column(db.Float)
 
-# not used
+# used
 class CausalFlow(db.Model):
     __tablename__ = 'causal_flow'
 
     id = db.Column(db.Integer, primary_key=True)
     somatic_mutation_id = db.Column(db.ForeignKey('somatic_mutation.id'), index=True) # links through to mutation
     regulator_id = db.Column(db.Integer) # should this link to a table? miRNA table id or TFRegualtor table id. union types?
-    regulator_type = db.Column(db.String(10)) # what is this? miRNA or Transcription Factor (table name!!!)
+    regulator_type = db.Column(db.String(10)) # what is this? miRNA or Transcription Factor (table name!!!). should be "tf" or "mirna"
     bicluster_id = db.Column(db.ForeignKey('bicluster.id'), index=True)
     leo_nb_atob = db.Column(db.Float)
     mlogp_m_atob = db.Column(db.Float)
@@ -213,7 +213,7 @@ class Patient(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(50), index=True)
 
-# not used
+# used
 class PhenoDatum(db.Model):
     __tablename__ = 'pheno_data'
 
@@ -228,7 +228,7 @@ class PhenoDatum(db.Model):
     patient = db.relationship('Patient', primaryjoin='PhenoDatum.patient_id == Patient.id', backref='pheno_data')
     phenotype = db.relationship('Phenotype', primaryjoin='PhenoDatum.phenotype_id == Phenotype.id', backref='pheno_data')
 
-# not used
+# used
 class Phenotype(db.Model):
     __tablename__ = 'phenotype'
 
@@ -260,6 +260,8 @@ class SomaticMutation(db.Model):
     locus_id = db.Column(db.ForeignKey('locus.id'), index=True)
 
     locus = db.relationship('Locus', primaryjoin='SomaticMutation.locus_id == Locus.id', backref='somatic_mutations')
+
+    mutation_name = ""
 
 # used
 class TfRegulator(db.Model):

@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 ##########################################################
 ## OncoMerge:  app.py                                   ##
 ##  ______     ______     __  __                        ##
@@ -27,7 +29,7 @@ import os
 import csv
 from functools import wraps
 
-#import MySQLdb
+# import MySQLdb
 import mysql.connector
 from flask import Flask, Response, url_for, redirect, render_template, request, session, flash, jsonify
 import flask
@@ -37,23 +39,24 @@ import itertools
 import gzip
 import pandas
 import numpy as np
-#import rpy2.robjects as robjects
+# import rpy2.robjects as robjects
 from scipy.stats import hypergeom
 
 
 NUM_PARTS = 5
 
-convert = {'Evading apoptosis':'cellDeath.gif', 'Evading immune detection':'avoidImmuneDestruction.gif', 'Genome instability and mutation':'genomicInstability.gif', 'Insensitivity to antigrowth signals':'evadeGrowthSuppressors.gif', 'Limitless replicative potential':'immortality.gif', 'Reprogramming energy metabolism':'cellularEnergetics.gif', 'Self sufficiency in growth signals':'sustainedProliferativeSignalling.gif', 'Sustained angiogenesis':'angiogenesis.gif', 'Tissue invasion and metastasis':'invasion.gif', 'Tumor promoting inflammation':'promotingInflammation.gif'}
+convert = {'Evading apoptosis': 'cellDeath.gif', 'Evading immune detection': 'avoidImmuneDestruction.gif', 'Genome instability and mutation': 'genomicInstability.gif', 'Insensitivity to antigrowth signals': 'evadeGrowthSuppressors.gif', 'Limitless replicative potential': 'immortality.gif',
+    'Reprogramming energy metabolism': 'cellularEnergetics.gif', 'Self sufficiency in growth signals': 'sustainedProliferativeSignalling.gif', 'Sustained angiogenesis': 'angiogenesis.gif', 'Tissue invasion and metastasis': 'invasion.gif', 'Tumor promoting inflammation': 'promotingInflammation.gif'}
 
-import os
 print(os.getcwd())
 
 app = Flask(__name__)
 # app.config.from_envvar('MESO_SETTINGS')
 
 ######################################################################
-#### General helpers
+# General helpers
 ######################################################################
+
 
 def dbconn():
     '''
@@ -71,7 +74,7 @@ def dbconn():
     'port': "3306",
     'database': "mpm_web",
     '''
-    
+
     config = {
         'user': "root",
         'password': "root",
@@ -81,15 +84,17 @@ def dbconn():
     }
     return mysql.connector.connect(**config)
 
+
 def read_exps():
     with gzip.open(app.config['GENE_EXPR_FILE'], 'rb') as f:
         return pandas.read_csv(f, sep=',', index_col=0, header=0)
 
 ######################################################################
-#### Graph/Visualization functionality
+# Graph/Visualization functionality
 ######################################################################
 
-GRAPH_COLOR_MAP = {
+
+'''GRAPH_COLOR_MAP = {
     'control': '#6abd45',
     'classical': 'black',
     'neural': '#32689b',
@@ -97,23 +102,36 @@ GRAPH_COLOR_MAP = {
     'g_cimp': '#8a171a',
     'proneural': '#ed2024',
     'mesenchymal': '#faa41a'
-}
+}'''
 
 # order in which the enrichment phenotypes are ordered
-ENRICHMENT_PHENOTYPES = [
+'''ENRICHMENT_PHENOTYPES = [
     'g_cimp', 'proneural', 'neural', 'classical', 'mesenchymal', 'control'
+]'''
+
+ENRICHMENT_PHENOTYPES = [
+    "Sarcomatoid", "Epithelioid", "Desmoplastic", "Biphasic",
 ]
 
+GRAPH_COLOR_MAP = {
+    'Sarcomatoid': '#2c6dd4',
+    'Epithelioid': '#8a171a',
+    'Desmoplastic': '#ed2024',
+    'Biphasic': '#faa41a',
+    'NA': 'grey',
+}
 
-#def phyper(q, m, n, k, lower_tail=False):
+
+# def phyper(q, m, n, k, lower_tail=False):
 #    """calls the R function phyper"""
 #    r_phyper = robjects.r['phyper']
 #    kwargs = {'lower.tail': lower_tail}
 #    return float(r_phyper(float(q), float(m), float(n), float(k), **kwargs)[0])
 
-def phyper(q, m, n, k, lower_tail=False):
+def phyper(x, M, n, bigN, lower_tail=False):
     """uses scipy.stats to compute hypergeometric overlap p-value"""
-    return 1-hypergeom.cdf(float(q), float(n), float(m), float(k))
+    return 1 - hypergeom.cdf(float(x), float(M), float(n), float(bigN))
+
 
 def submat_data(submat, col_indexes):
     """given a sub matrix and a list of column indexes
@@ -136,92 +154,134 @@ def submat_data(submat, col_indexes):
             for i, idx in enumerate(col_indexes)]
     return sorted(data, key=lambda x: x[3])
 
-
-def cluster_data(cursor, cluster_id, df):
-    patient_map = {name: index
-                   for index, name in enumerate(df.columns.values)}
-    gene_map = {name.upper(): index for index, name in enumerate(df.index)}
-
-    cursor.execute("""select g.symbol from bic_gene bg
-join gene g on bg.gene_id=g.id where bicluster_id=%s""", [cluster_id])
+# rewritten function, works to the best of my knowledge
+def cluster_data(cursor, cluster_id):
+    cursor.execute("""SELECT g.entrez from bic_gene bg
+        JOIN gene g ON bg.gene_id=g.id WHERE bicluster_id=%s""", [cluster_id])
     genes = [row[0] for row in cursor.fetchall()]
+    gene_count = len(genes)
+    genes_string = "(%s)" % ','.join(map(lambda p: '%s' % p, genes))
 
-    cursor.execute("""select name from bic_pat bp
-join patient p on bp.patient_id=p.id where bicluster_id=%s""",
-                   [cluster_id])
-    patients = [row[0] for row in cursor.fetchall()]
-
-    cursor.execute("""select name from patient where id not in
-(select patient_id from bic_pat where bicluster_id=%s)""",
-                   [cluster_id])
-    excluded_patients = [row[0] for row in cursor.fetchall()]
-
-
-    gene_indexes = sorted([gene_map[g.upper()] for g in genes])
-    patient_indexes = sorted([patient_map[p] for p in patients])
-    ex_patient_indexes = sorted([patient_map[p] for p in excluded_patients])
-
-    submat = df.values[np.ix_(gene_indexes, patient_indexes)]
-    in_data = submat_data(submat, patient_indexes)
-
-    ex_submat = df.values[np.ix_(gene_indexes, ex_patient_indexes)]
-    out_data = submat_data(ex_submat, ex_patient_indexes)
-    return in_data, out_data
-
-
-def subtype_enrichment(cursor, cluster_id, df):
-    patient_map = {name: index
-                   for index, name in enumerate(df.columns.values)}
-    gene_map = {name.upper(): index for index, name in enumerate(df.index)}
-
-    cursor.execute("""select g.symbol from bic_gene bg
-join gene g on bg.gene_id=g.id where bicluster_id=%s""", [cluster_id])
-    genes = [row[0] for row in cursor.fetchall()]
-
-    cursor.execute("""select name from bic_pat bp
-join patient p on bp.patient_id=p.id where bicluster_id=%s""",
-                   [cluster_id])
+    # get patients based on the given bicluster id
+    cursor.execute("""SELECT name FROM bic_pat bp
+        JOIN patient p ON bp.patient_id=p.id WHERE bicluster_id=%s""",
+        [cluster_id])
     included_patients = [row[0] for row in cursor.fetchall()]
+    included_patients_string = "(%s)" % ','.join(map(lambda p: '\'%s\'' % p, included_patients))
 
-    cursor.execute("""select name from patient where id not in
-(select patient_id from bic_pat where bicluster_id=%s)""",
-                   [cluster_id])
+    # get excluded patients based on the given bicluster id
+    cursor.execute("""SELECT name FROM patient WHERE id NOT IN
+        (SELECT patient_id FROM bic_pat WHERE bicluster_id=%s)""",
+        [cluster_id])
     excluded_patients = [row[0] for row in cursor.fetchall()]
+    excluded_patients_string = "(%s)" % ','.join(map(lambda p: '\'%s\'' % p, excluded_patients))
 
-    gene_indexes = sorted([gene_map[g.upper()] for g in genes])
+    '''
+    # lol part 1. also, i hate this sql statement. despite the obvious injection risk, this is fine. genes_string and included_patients_string is generated from an unexploitable source
+    cursor.execute("SELECT value FROM gene_expression ge " # at the end of this, we're getting values from the gene_expression table
+        + "JOIN gene g ON ge.gene_id=g.id " # we want to search based on gene entrez, so we JOIN the gene table with the gene expression table
+        + "JOIN patient p ON ge.patient_id=p.id " # we want to also search based on patient name, so we JOIN the patient table with the gene expression table
+        + "WHERE g.entrez IN " + genes_string + " " # we're looking for gene entrez ids that we found in the bic_gene table based on the input bicluster id
+        + "AND p.name IN " + included_patients_string + ";") # we're looking for patient names that we found in the patient table based on the given bicluster id
+    included_patients_result = [row[0] for row in cursor.fetchall()]
+    submat = np.ndarray((gene_count, len(included_patients)), dtype=float, buffer=np.array(included_patients_result), offset=0, strides=None, order=None) # we want a submatrix (whatever that is) of all the different gene expression values we found
+    in_data = submat_data(submat, included_patients) # throw the submatrix at this function, does statistics on the data
+
+    # lol part 2. also, i hate this sql statement. despite the obvious injection risk, this is fine. genes_string and excluded_patients_string is generated from an unexploitable source
+    cursor.execute("SELECT value FROM gene_expression ge " # at the end of this, we're getting values from the gene_expression table
+        + "JOIN gene g ON ge.gene_id=g.id " # we want to search based on gene entrez, so we JOIN the gene table with the gene expression table
+        + "JOIN patient p ON ge.patient_id=p.id " # we want to also search based on patient name, so we JOIN the patient table with the gene expression table
+        + "WHERE g.entrez IN " + genes_string + " " # we're looking for gene entrez ids that we found in the bic_gene table based on the input bicluster id
+        + "AND p.name IN " + excluded_patients_string + ";") # we're looking for patient names that we DIDN'T find in the patient table based on the given bicluster id
+    excluded_patients_result = [row[0] for row in cursor.fetchall()]
+    ex_submat = np.ndarray((gene_count, len(excluded_patients)), dtype=float, buffer=np.array(excluded_patients_result), offset=0, strides=None, order=None) # we want a submatrix (whatever that is) of all the different gene expression values we found
+
+    out_data = submat_data(ex_submat, excluded_patients)
+    '''
+
+    all_patients_string = "(%s)" % ",".join(map(lambda p: '\'%s\'' % p, included_patients + excluded_patients))
+    cursor.execute("SELECT value FROM gene_expression ge " # at the end of this, we're getting values from the gene_expression table
+        + "JOIN gene g ON ge.gene_id=g.id " # we want to search based on gene entrez, so we JOIN the gene table with the gene expression table
+        + "JOIN patient p ON ge.patient_id=p.id " # we want to also search based on patient name, so we JOIN the patient table with the gene expression table
+        + "WHERE g.entrez IN " + genes_string + " " # we're looking for gene entrez ids that we found in the bic_gene table based on the input bicluster id
+        + "AND p.name IN " + all_patients_string + ";") # all patient names
+    result = [row[0] for row in cursor.fetchall()]
+    submat = np.ndarray((gene_count, len(included_patients + excluded_patients)), dtype=float, buffer=np.array(result), offset=0, strides=None, order=None) # we want a submatrix (whatever that is) of all the different gene expression values we found
+    data = submat_data(submat, included_patients + excluded_patients) # throw the submatrix at this function, does statistics on the data
+
+    return data
+
+
+def subtype_enrichment(cursor, cluster_id):
+    cursor.execute("""SELECT g.entrez from bic_gene bg
+        JOIN gene g ON bg.gene_id=g.id WHERE bicluster_id=%s""", [cluster_id])
+    genes = [row[0] for row in cursor.fetchall()]
+    gene_count = len(genes)
+    genes_string = "(%s)" % ','.join(map(lambda p: '%s' % p, genes))
+
+    # get patients based on the given bicluster id
+    cursor.execute("""SELECT name FROM bic_pat bp
+        JOIN patient p ON bp.patient_id=p.id WHERE bicluster_id=%s""",
+        [cluster_id])
+    included_patients = [row[0] for row in cursor.fetchall()]
+    included_patients_string = "(%s)" % ','.join(map(lambda p: '\'%s\'' % p, included_patients))
+
+    # get excluded patients based on the given bicluster id
+    cursor.execute("""SELECT name FROM patient WHERE id NOT IN
+        (SELECT patient_id FROM bic_pat WHERE bicluster_id=%s)""",
+        [cluster_id])
+    excluded_patients = [row[0] for row in cursor.fetchall()]
+    excluded_patients_string = "(%s)" % ','.join(map(lambda p: '\'%s\'' % p, excluded_patients))
 
     # above is exactly like boxplot
     # now make a phenotype map
-    cursor.execute("""select p.name, pt.name from patient p join phenotypes pt on p.phenotype_id=pt.id
-where pt.name <> 'NA'""")
-    ptmap = {patient: phenotype for patient, phenotype in cursor.fetchall()}
-    all_patients = {patient for patient in ptmap.keys()}
-    phenotypes = {phenotype for phenotype in ptmap.values()}
+    # cursor.execute("""SELECT p.name, pt.name FROM patient p JOIN phenotypes pt ON p.phenotype_id=pt.id
+    #    WHERE pt.name <> 'NA'""")
+    cursor.execute("""SELECT p.name, pd.phenotype_string FROM pheno_data pd
+        JOIN patient p ON pd.patient_id=p.id
+        JOIN phenotype pt ON pd.phenotype_id=pt.id
+        WHERE pt.name="histology_WHO" 
+            AND pd.phenotype_string <> 'NA'""")
+    # histology_WHO phenotype lookup ^^^
 
-    in_patient_indexes = sorted([patient_map[p] for p in included_patients if p in all_patients])
-    ex_patient_indexes = sorted([patient_map[p] for p in excluded_patients if p in all_patients])
+    ptmap = {patient: phenotype for patient, phenotype in cursor.fetchall()} # don't change
+    all_patients = {patient for patient in ptmap.keys()} # don't change
+    phenotypes = {phenotype for phenotype in ptmap.values()} # don't change
 
     # we use the submat_data function to sort our patients
-    in_submat = df.values[np.ix_(gene_indexes, in_patient_indexes)]
-    in_data = submat_data(in_submat, in_patient_indexes)
-    sorted_in_indexes = [row[0] for row in in_data]
-    ex_submat = df.values[np.ix_(gene_indexes, ex_patient_indexes)]
-    ex_data = submat_data(ex_submat, ex_patient_indexes)
-    sorted_ex_indexes = [row[0] for row in ex_data]
+    # lol part 1. also, i hate this sql statement. despite the obvious injection risk, this is fine. genes_string and included_patients_string is generated from an unexploitable source
+    cursor.execute("SELECT value FROM gene_expression ge " # at the end of this, we're getting values from the gene_expression table
+        + "JOIN gene g ON ge.gene_id=g.id " # we want to search based on gene entrez, so we JOIN the gene table with the gene expression table
+        + "JOIN patient p ON ge.patient_id=p.id " # we want to also search based on patient name, so we JOIN the patient table with the gene expression table
+        + "WHERE g.entrez IN " + genes_string + " " # we're looking for gene entrez ids that we found in the bic_gene table based on the input bicluster id
+        + "AND p.name IN " + included_patients_string + ";") # we're looking for patient names that we found in the patient table based on the given bicluster idnames that we found in the patient table based on the given bicluster id
+    included_patients_result = [row[0] for row in cursor.fetchall()]
+    in_submat = np.ndarray((gene_count, len(included_patients)), dtype=float, buffer=np.array(included_patients_result), offset=0, strides=None, order=None) # we want a submatrix (whatever that is) of all the different gene expression values we found
+    in_data = submat_data(in_submat, included_patients) # throw the submatrix at this function, does statistics on the data
+    sorted_in_names = [row[0] for row in in_data] # NOTE: due to my changes to account for the gene_expression table, row[0] is now a PATIENT NAME, not a PATIENT INDEX.
+
+    # lol part 2. also, i hate this sql statement. despite the obvious injection risk, this is fine. genes_string and excluded_patients_string is generated from an unexploitable source
+    cursor.execute("SELECT value FROM gene_expression ge " # at the end of this, we're getting values from the gene_expression table
+        + "JOIN gene g ON ge.gene_id=g.id " # we want to search based on gene entrez, so we JOIN the gene table with the gene expression table
+        + "JOIN patient p ON ge.patient_id=p.id " # we want to also search based on patient name, so we JOIN the patient table with the gene expression table
+        + "WHERE g.entrez IN " + genes_string + " " # we're looking for gene entrez ids that we found in the bic_gene table based on the input bicluster id
+        + "AND p.name IN " + excluded_patients_string + ";") # we're looking for patient names that we DIDN'T find in the patient table based on the given bicluster idfor patient names that we DIDN'T find in the patient table based on the given bicluster id
+    excluded_patients_result = [row[0] for row in cursor.fetchall()]
+    ex_submat = np.ndarray((gene_count, len(excluded_patients)), dtype=float, buffer=np.array(excluded_patients_result), offset=0, strides=None, order=None) # we want a submatrix (whatever that is) of all the different gene expression values we found 
+    ex_data = submat_data(ex_submat, excluded_patients)    
+    sorted_ex_names = [row[0] for row in ex_data] # NOTE: due to my changes to account for the gene_expression table, row[0] is now a PATIENT NAME, not a PATIENT INDEX.
 
     # sorted by median pValue
-    sorted_patient_indexes = sorted_in_indexes + sorted_ex_indexes
+    sorted_patient_names = sorted_in_names + sorted_ex_names
 
     # group patients into phenotype groups.
     # NOTE: the ptmap items need to be sorted, otherwise groupby fails to group correctly
-    pt_patients = itertools.groupby(sorted(ptmap.items(), key=lambda pair: pair[1]),
-                                    key=lambda pair: pair[1])
-    pt_patients = {phenotype: set(map(lambda p: p[0], patients))
-                   for phenotype, patients in pt_patients}
+    pt_patients = itertools.groupby(sorted(ptmap.items(), key=lambda pair: pair[1]), key=lambda pair: pair[1])
+    pt_patients = {phenotype: set(map(lambda p: p[0], patients)) for phenotype, patients in pt_patients}
 
-    num_columns = len(all_patients)
+    num_columns = len(sorted_patient_names)
     cols_per_part = int(math.floor(num_columns / NUM_PARTS))
-    #print "# columns: %d # cols/part: %d" % (num_columns, cols_per_part)
+    # print "# columns: %d # cols/part: %d" % (num_columns, cols_per_part)
 
     pvalues = []
     min_pvalue = 100.0
@@ -235,31 +295,33 @@ where pt.name <> 'NA'""")
         # adjust end for the last part
         if i == (NUM_PARTS - 1) and end != (num_columns - 1):
             end = num_columns - 1
-        cur_patients = [df.columns.values[p_i] for p_i in sorted_patient_indexes[start:end + 1]]
-        #print "Part %d, %d-%d, # current patients: %d" % (i, start, end, len(cur_patients))
+        cur_patients = [p_i for p_i in sorted_patient_names[start:end + 1]]
+        # print "Part %d, %d-%d, # current patients: %d" % (i, start, end, len(sorted_patient_names))
         for phenotype in phenotypes:
-            q = len([p for p in cur_patients if p in pt_patients[phenotype]])
-            k = len(cur_patients)
-            m = len(pt_patients[phenotype])
-            n = num_columns - m
-            pvalue = phyper(q, m, n, k)
-            #print "part %d, phenotype: %s, q=%d, k=%d, m=%d, n=%d" % (i, phenotype, q, k, m, n)
-            if pvalue == 0.0:
-                pvalue = 10e-10
+            x = len([p for p in cur_patients if p in pt_patients[phenotype]])
+            bigN = len(cur_patients)
+            n = len(pt_patients[phenotype])
+            n = len([p for p in sorted_patient_names if p in pt_patients[phenotype]])
+            M = len(sorted_patient_names)
+            pvalue = phyper(x, M, n, bigN)
+            
+            if x != 0 and pvalue != 0.0:
+                if pvalue == 0.0:
+                    pvalue = 10e-10
 
-            if pvalue <= 0.5:
-                pvalue = -math.log10(2 * pvalue)
-            else:
-                pvalue = math.log10(2 * (1.0 - pvalue))
+                if pvalue <= 0.5:
+                    pvalue = -math.log10(2 * pvalue)
+                else:
+                    pvalue = math.log10(2 * (1.0 - pvalue))
 
-            if math.isinf(pvalue):
-                signum = -1 if pvalue < 0 else 1
-                pvalue = signum * -math.log10(10e-10)
+                if math.isinf(pvalue):
+                    signum = -1 if pvalue < 0 else 1
+                    pvalue = signum * -math.log10(10e-10)
 
-            if pvalue < min_pvalue:
-                min_pvalue = pvalue
-            if pvalue > max_pvalue:
-                max_pvalue = pvalue
+                if pvalue < min_pvalue:
+                    min_pvalue = pvalue
+                if pvalue > max_pvalue:
+                    max_pvalue = pvalue
 
             part_pvalues[phenotype] = pvalue
         pvalues.append(part_pvalues)
@@ -268,7 +330,7 @@ where pt.name <> 'NA'""")
 
 
 ######################################################################
-#### Available application paths
+# Available application paths
 ######################################################################
 
 @app.errorhandler(Exception)
@@ -306,8 +368,10 @@ FROM bicluster WHERE name=%s""", [bicluster])
     # Replication
     c.execute("""SELECT * FROM replication WHERE bicluster_id=%s""", [bc_pk])
     tmp = list(c.fetchall())
-    repConvert = {'French':'Gravendeel, et al. 2009','REMBRANDT':'Madhavan, et al. 2009','GSE7696':'Murat, et al. 2008'}
-    repPubmed = {'French':'19920198','REMBRANDT':'19208739','GSE7696':'18565887'}
+
+    # replication datasets (add MESO TCGA in correctly)
+    repConvert = {"MESO TCGA": "Hmeljak, et al. 2018"}
+    repPubmed = {"MESO TCGA": "30322867"}
     replication = []
 
     replicated = [0, 0]
@@ -334,31 +398,45 @@ FROM bicluster WHERE name=%s""", [bicluster])
     elements.append({'data': { 'id': 'bc%d' % bc_pk, 'name': bc_name}, 'classes': 'bicluster' })
 
     regulators = []
-    c.execute("""SELECT g.id, g.symbol, tfr.action FROM tf_regulator tfr join gene g on tfr.gene_id=g.id
-WHERE tfr.bicluster_id=%s""", [bc_pk])
+    # c.execute("""SELECT g.id, g.symbol, tfr.action FROM tf_regulator tfr join gene g on tfr.gene_id=g.id WHERE tfr.bicluster_id=%s""", [bc_pk])
+    c.execute("""SELECT g.id, g.symbol, tfr.r_value FROM tf_regulator tfr join gene g on tfr.tf_id=g.id WHERE tfr.bicluster_id=%s""", [bc_pk])
     tfs = list(c.fetchall())
     tfList = []
     for tf in tfs:
         known = 'No'
-        c.execute("""SELECT * FROM tf_crispr WHERE gene_id=%s""", [tf[0]])
+        '''
+        c.execute("""SELECT * FROM tf_crispr WHERE gene_id=%s""", [tf[0]]) # we will have this table soon
         for crispr in c.fetchall():
             if float(crispr[4])<=0.05:
                 known = 'Yes'
-        regulators.append(['TF', tf[0], tf[1], tf[2].capitalize(), known])
+        '''
+
+        tf_action = "Repressor"
+        if tf[2] > 0:
+            tf_action = "Activator"
+
+        regulators.append(['TF', tf[0], tf[1], tf_action, known])
         tfList.append(tf[1])
         elements.append({'data': { 'id': 'reg%d' % tf[0], 'name': tf[1] }, 'classes': 'tf' })
-        elements.append({'data': { 'id': 'tfbc%d' % tf[0], 'source': 'reg%d' % tf[0], 'target': 'bc%d' % bc_pk }, 'classes': tf[2] })
+        elements.append({'data': { 'id': 'tfbc%d' % tf[0], 'source': 'reg%d' % tf[0], 'target': 'bc%d' % bc_pk }, 'classes': "N/A Action" })
 
-    c.execute("""SELECT mirna.id, mirna.name, mirna.mir2disease, mirna.hmdd
-FROM mirna_regulator mr join mirna on mirna.id=mr.mirna_id WHERE mr.bicluster_id=%s""", [bc_pk])
+    c.execute("""SELECT mirna.id, mirna.name FROM mirna_regulator mr join mirna on mirna.id=mr.mirna_id WHERE mr.bicluster_id=%s""", [bc_pk])
     mirnas = list(c.fetchall())
 
     mirnaList = []
     for mirna in mirnas:
         if not mirna[0] in mirnaList:
+            # our known is yes if we can find any mirna's given the mirna sql id
             known = 'No'
-            if (not mirna[2]=='no') or (not mirna[3]==0):
+            c.execute("""SELECT COUNT(*) FROM mirna_prior WHERE mirna_id=%s""", [mirna[0]])
+            mirna_count = c.fetchone()[0]
+            if mirna_count != 0:
                 known = 'Yes'
+            
+            # old code
+            # if (not mirna[2]=='no') or (not mirna[3]==0):
+            #    known = 'Yes'
+            
             regulators.append(['miRNA', mirna[0], mirna[1], 'Repressor', known])
             mirnaList.append(mirna[1])
             elements.append({'data': { 'id': 'reg%d' % mirna[0], 'name': mirna[1]}, 'classes': 'mirna' })
@@ -375,23 +453,29 @@ FROM causal_flow WHERE bicluster_id=%s""", [bc_pk])
 
     for cf_pk, cf_som_mut_id, cf_reg_id, cf_reg_type, cf_bc_id, cf_leo, cf_mlogp in tmp_cf:
         if cf_reg_type == 'tf':
-            c.execute("""SELECT symbol FROM gene WHERE id=%s""", [cf_reg_id])
+            c.execute("""SELECT g.symbol FROM tf_regulator tr JOIN gene g ON tr.tf_id = g.id WHERE tr.id=%s""", [cf_reg_id])
             g1 = c.fetchone()[0]
         else:
-            c.execute("""SELECT name FROM mirna WHERE id=%s""", [cf_reg_id])
+            c.execute("""SELECT m.name FROM mirna_regulator mr JOIN mirna m ON mr.mirna_id = m.id WHERE mr.id=%s""", [cf_reg_id])
             g1 = c.fetchone()[0]
 
         if (cf_reg_type == 'tf' and g1 in tfList) or (cf_reg_type == 'mirna' and g1 in mirnaList):
             c.execute("""SELECT * FROM somatic_mutation WHERE id=%s""", [cf_som_mut_id])
             m1 = c.fetchone()
-            if m1[2]=='gene':
+            if m1[3] == None:
                 c.execute("""SELECT symbol FROM gene WHERE id=%s""", [m1[1]])
                 mut = c.fetchone()[0]
-            elif m1[2]=='pathway':
-                c.execute("""SELECT name FROM nci_nature_pathway WHERE id=%s""", [m1[1]])
+            else:
+                c.execute("""SELECT locus_name FROM locus WHERE id=%s """, [m1[3]]) # test: make sure this gets loci
                 mut = c.fetchone()[0]
+
+            ''' old code:
+            elif m1[2]=='pathway':
+                c.execute("""SELECT name FROM nci_nature_pathway WHERE id=%s""", [m1[1]]) # discrep. don't have this table
+                mut = c.fetchone()[0]
+            '''
             causalFlows.append([mut, g1])
-            elements.append({'data': { 'id': 'mut%d' % cf_som_mut_id, 'name': mut}, 'classes': 'genotype' })
+            elements.append({'data': { 'id': 'mut%d' % cf_som_mut_id, 'name': mut}, 'classes': 'genotype' }) # feature: differnet colors for genes vs loci
             elements.append({'data': { 'id': 'cf%d' % cf_pk, 'source': 'mut%d' % cf_som_mut_id, 'target': 'reg%d' % cf_reg_id } })
 
     causalFlows = sorted(causalFlows, key=lambda mutation: mutation[0])
@@ -415,30 +499,47 @@ WHERE bic_go.bicluster_id=%s""", [bc_pk])
         gobps.append(list(gobp) + [[row[0] for row in c.fetchall()]])
 
     # Prepare graph plotting data
-    exp_data = read_exps()
-    in_data, out_data = cluster_data(c, bc_pk, exp_data)
-    enrichment_pvalues, min_enrichment_pvalue, max_enrichment_pvalue = subtype_enrichment(c, bc_pk, exp_data)
+    # exp_data = read_exps()
+    # in_data, out_data = cluster_data(c, bc_pk)
+    all_boxplot_data = cluster_data(c, bc_pk)
+    enrichment_pvalues, min_enrichment_pvalue, max_enrichment_pvalue = subtype_enrichment(c, bc_pk)
     js_enrichment_data = []
     js_enrichment_colors = []
     for part in enrichment_pvalues:
         for phenotype in ENRICHMENT_PHENOTYPES:
             js_enrichment_data.append([phenotype, part[phenotype]])
-            js_enrichment_colors.append(GRAPH_COLOR_MAP[phenotype])
+            js_enrichment_colors.append(GRAPH_COLOR_MAP[phenotype]) # TODO: make the color information dynamically load in
     enrichment_upper = -math.log10(0.05/30.0)
     enrichment_lower = math.log10(0.05/30.0)
     enrich_perc20 = len(js_enrichment_data) / 5
-    enrich_quintiles = [enrich_perc20 * i for i in range(1, 6)]
+    enrich_quintiles = [enrich_perc20 * i - 0.5 for i in range(1, 6)]
 
-    ratios_mean = np.mean(exp_data.values)
-    all_boxplot_data = in_data + out_data
-    patients = [exp_data.columns.values[item[0]] for item in all_boxplot_data]
-    c.execute("""select p.name, pt.name from patient p join phenotypes pt on p.phenotype_id=pt.id where p.name in (%s)""" %
+    ratios_mean = 8.167528228975065 # TODO: have some way to precompute the mean for all the 4.5 million gene_expression cells
+    # all_boxplot_data = in_data + out_data
+    patients = [item[0] for item in all_boxplot_data]
+
+    c.execute("""SELECT p.name, pd.phenotype_string FROM patient p
+        JOIN pheno_data pd ON pd.patient_id=p.id
+        JOIN phenotype pt ON pd.phenotype_id=pt.id
+        WHERE p.name IN (%s) AND pt.name='histology_WHO'""" %
               ','.join(map(lambda p: '\'%s\'' % p, patients)))
     ptmap = {patient: phenotype for patient, phenotype in c.fetchall()}
     phenotypes = [ptmap[patient] for patient in patients]
     boxplot_colors = [GRAPH_COLOR_MAP[pt] for pt in phenotypes]
-    js_boxplot_data = [[patients[i]] + item[1:] for i, item in enumerate(all_boxplot_data)]
-    perc20 = len(in_data) / 5
+    # js_boxplot_data = [[patients[i]] + item[1:] for i, item in enumerate(all_boxplot_data)]
+
+    js_boxplot_data = [{
+        "name": patients[i],
+        "low": item[1],
+        "q1":  item[2],
+        "median": item[3],
+        "q3": item[4],
+        "high": item[5],
+        "fillColor": "%sAA" % GRAPH_COLOR_MAP[ptmap[patients[i]]], # get the color and append a transparency value
+    } for i, item in enumerate(all_boxplot_data)]
+    
+    # perc20 = len(in_data) / 5
+    perc20 = len(all_boxplot_data) / 5
     quintiles = [perc20 * i for i in range(1, 6)]
     db.close()
 
@@ -450,7 +551,7 @@ def search():
     gene = request.args.get('gene')
     db = dbconn()
     c = db.cursor()
-    type ='gene'
+    bme_type ='gene'
     if not gene:
         return render_template('index.html')
     if gene.find('hsa-')==-1:
@@ -459,14 +560,14 @@ def search():
     else:
         c.execute("""SELECT name FROM mirna WHERE name=%s""", [gene])
         geneData = c.fetchall()
-        type = 'mirna'
+        bme_type = 'mirna'
     db.close()
 
     if len(geneData)==0:
         return render_template('index.html')
 
     symbol = geneData[0][0]
-    if type == 'gene':
+    if bme_type == 'gene':
         return redirect(url_for('gene', symbol=symbol))
     else:
         return redirect(url_for('mirna', symbol=symbol))
@@ -475,7 +576,7 @@ def search():
 def __get_muts(c, gene_pk, symbol):
     # Get causal flows downstream of mutation in gene
     muts = {}
-    c.execute("""SELECT * FROM somatic_mutation WHERE mutation_type='gene' AND ext_id=%s""", [gene_pk])
+    c.execute("""SELECT * FROM somatic_mutation WHERE locus_id IS NULL AND ext_id=%s""", [gene_pk]) # discrep. (we never have a mutation type of gene). test: make sure that we only get genes (not loci) from this query
     tmp_muts = c.fetchall()
     if len(tmp_muts)==1:
         muts['name'] = symbol
@@ -490,17 +591,20 @@ def __get_muts(c, gene_pk, symbol):
         for cf1 in tmp_cf:
             g1 = ''
             if cf1[3]=='tf':
-                c.execute("""SELECT * FROM tf_regulator WHERE gene_id=%s AND bicluster_id=%s""", [cf1[2], cf1[4]])
-                if len(c.fetchall())>0:
-                    c.execute("""SELECT symbol FROM gene WHERE id=%s""", [cf1[2]])
+                # c.execute("""SELECT * FROM tf_regulator WHERE tf_id=%s AND bicluster_id=%s""", [cf1[2], cf1[4]])
+                c.execute("""SELECT * FROM tf_regulator WHERE id=%s""", [cf1[2]])
+                tf = c.fetchall()
+                if len(tf) > 0:
+                    c.execute("""SELECT symbol FROM gene WHERE id=%s""", [tf[0][2]])
                     g1 = c.fetchall()[0][0]
                     if not g1 in muts['regs']:
                         muts['regs'].append(g1)
                         muts['tfs'].append(g1)
             else:
-                c.execute("""SELECT * FROM mirna_regulator WHERE mirna_id=%s AND bicluster_id=%s""", [cf1[2], cf1[4]])
-                if len(c.fetchall())>0:
-                    c.execute("""SELECT name FROM mirna WHERE id=%s""", [cf1[2]])
+                c.execute("""SELECT * FROM mirna_regulator WHERE id=%s""", [cf1[2], cf1[4]])
+                mirna = c.fetchall()
+                if len(mirna) > 0:
+                    c.execute("""SELECT name FROM mirna WHERE id=%s""", [mirna[0][2]])
                     g1 = c.fetchall()[0][0]
                     if not g1 in muts['regs']:
                         muts['regs'].append(g1)
@@ -520,7 +624,7 @@ def __get_muts(c, gene_pk, symbol):
     return muts
 
 
-def __get_regulators(c, symbol):
+def __get_regulators(c, symbol, bme_type):
     regs = {}
     tmp_regs = c.fetchall()
     if len(tmp_regs)>0:
@@ -530,7 +634,7 @@ def __get_regulators(c, symbol):
         # Collect all biclusters downstream regulated by TF or miRNA
         for reg in tmp_regs:
             action = 'Rep.'
-            if type=='gene' and reg[3] == 'activator':
+            if bme_type =='gene' and reg[3] == 'activator':
                 action = 'Act.'
             c.execute("""SELECT name, survival, survival_p_value FROM bicluster WHERE id=%s""", [reg[1]])
             b1 = c.fetchall()[0]
@@ -553,7 +657,7 @@ def mirna(symbol=None, defaults={'symbol': None}):
     mirna_pk = c.fetchone()[0]
     muts = __get_muts(c, mirna_pk, symbol)
     c.execute("""SELECT * FROM mirna_regulator WHERE mirna_id=%s""", [mirna_pk])
-    regs = __get_regulators(c, symbol)
+    regs = __get_regulators(c, symbol, "mirna")
     db.close()
     return render_template('search.html', gene=symbol, muts={}, regs=regs, bics={})
 
@@ -566,8 +670,8 @@ def gene(symbol=None, defaults={'symbol': None}):
     c.execute("""SELECT id FROM gene WHERE symbol=%s""", [symbol])
     gene_pk = c.fetchone()[0]
     muts = __get_muts(c, gene_pk, symbol)
-    c.execute("""SELECT * FROM tf_regulator WHERE gene_id=%s""", [gene_pk])
-    regs = __get_regulators(c, symbol)
+    c.execute("""SELECT * FROM tf_regulator WHERE tf_id=%s""", [gene_pk])
+    regs = __get_regulators(c, symbol, "gene")
 
     # Get biclusters that gene resides
     bics = {}
@@ -578,7 +682,7 @@ def gene(symbol=None, defaults={'symbol': None}):
         bics['biclusters'] = len(tmp_bics)
         bics['data'] = []
         for bic1 in tmp_bics:
-            c.execute("SELECT hm.name FROM bic_hal bh join hallmark hm on bh.hallmark_id=hm.id WHERE bh.bicluster_id=%s",
+            c.execute("SELECT hm.name FROM bic_hal bh JOIN hallmark hm on bh.hallmark_id=hm.id WHERE bh.bicluster_id=%s",
                       [bic1[3]])
             tmp1 = c.fetchall()
             h1 = list(set([convert[i[0]] for i in tmp1]))

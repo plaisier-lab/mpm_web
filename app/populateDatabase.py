@@ -28,6 +28,7 @@ from decimal import Decimal
 # from pssm import pssm
 import pandas as pd
 import json
+import time
 
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
@@ -44,6 +45,20 @@ db = SQLAlchemy(app)
 """
 
 from models import *
+
+# https://stackoverflow.com/a/616672 for debugging
+import sys
+class Logger(object):
+    def __init__(self):
+        self.terminal = sys.stdout
+        open("console.log", "w").close() # clear the file
+        self.log = open("console.log", "a")
+
+    def write(self, message):
+        self.terminal.write(message)
+        self.log.write(message)
+
+sys.stdout = Logger()
 
 ########################################
 ### Functions to convert miRNA names ###
@@ -87,9 +102,12 @@ def compareMiRNANames(a, b):
 ## Load up conversion dictionaries ##
 #####################################
 
+start_time = time.time()
+
 # Genes
 symbol2entrez = {}
 entrez2symbol = {}
+print("gene2entrezId.csv")
 with open('data/gene2entrezId.csv', 'r') as inFile:
     while 1:
         inLine = inFile.readline()
@@ -103,6 +121,7 @@ with open('data/gene2entrezId.csv', 'r') as inFile:
 miRNAIDs = {}
 miRNAIDs_rev = {}
 mature_sequence_ids = []
+print("hsa.mature.fa")
 with open('data/hsa.mature.fa', 'r') as inFile:
     while 1:
         inLine = inFile.readline()
@@ -148,16 +167,15 @@ db.session.commit()
 # Add new expresssion dataset
 ed1 = ExpDataset(name='Genentech_MPM', type='gexp')
 db.session.add(ed1)
-gt_gexp = deepcopy(ed1)
+db.session.commit()
 
 # Load up gene expression data
-'''
 gene_expression_count = 0
 for patient1 in gexp1.columns:
     for gene1 in gexp1.index:
         if gene1 in genes:
             ge1 = GeneExpression(
-                exp_dataset_id=gt_gexp.id, patient_id=patients[patient1].id, gene_id=genes[gene1].id, value=float(gexp1[patient1][gene1]))
+                exp_dataset_id=ed1.id, patient_id=patients[patient1].id, gene_id=genes[gene1].id, value=float(gexp1[patient1][gene1]))
             db.session.add(ge1)
             gene_expression_count = gene_expression_count  +1
         
@@ -165,9 +183,7 @@ for patient1 in gexp1.columns:
             print("committing {} gene expressions...".format(gene_expression_count))
             db.session.commit()
             gene_expression_count = 0
-
 db.session.commit()
-'''
 
 # Add hallmarks of Cancer
 hallmark_names = ['Sustained angiogenesis', 'Insensitivity to antigrowth signals', 'Evading apoptosis', 'Limitless replicative potential', 'Evading immune detection',
@@ -183,7 +199,6 @@ for hn1 in hallmark_names:
 geneOntology = {}
 
 print("go.obo...")
-
 with open('data/go.obo', 'r') as inFile:
     while 1:
         line = inFile.readline()
@@ -205,32 +220,36 @@ with open('data/go.obo', 'r') as inFile:
             geneOntology[id1] = go1
             db.session.add(go1)
 
-print("gene2go.hsa...")
+db.session.commit()
 
 # Gene -> GO_BP
+print("gene2go.hsa...")
 with open('data/gene2go.hsa', 'r') as inFile:
     while 1:
         line = inFile.readline()
         if not line:
             break
         splitUp = line.strip().split('\t')
-        if splitUp[1] in genes and splitUp[2] in geneOntology:
+        if int(splitUp[1]) in genes and splitUp[2] in geneOntology:
             gg1 = GoGene(
-                go_bp_id=geneOntology[splitUp[2]].id, gene_id=genes[splitUp[1]].id)
+                go_bp_id=geneOntology[splitUp[2]].id, gene_id=genes[int(splitUp[1])].id)
             db.session.add(gg1)
 
 db.session.commit()
 
 # miRNAs
+print("miRNAs...")
 miRNAs = {}
 for miR1 in miRNAIDs:
     m1 = Mirna(mature_seq_id=miRNAIDs[miR1], name=miR1)
     db.session.add(m1)
     miRNAs[miRNAIDs[miR1]] = m1
 
-# Prior information
+db.session.commit()
 
+# Prior information
 # Load DisGeNET
+print("all_gene_disease_pmid_associations.csv...")
 mesos = ['Mesothelioma','Malignant mesothelioma','Malignant Pleural Mesothelioma',
     'Mesothelioma (malignant, clinical disorder) (disorder)','Malignant Mesothelioma of Peritoneum','Pleural Mesothelioma','Mesothelioma, biphasic, malignant','Sarcomatoid Mesothelioma']
 with open('data/all_gene_disease_pmid_associations.tsv','r') as inFile:
@@ -252,6 +271,7 @@ with open('data/all_gene_disease_pmid_associations.tsv','r') as inFile:
             db.session.add(gp1)
 
 # Load HMDD (miRNA_Name,PMID,Description)
+print("hmdd_mpm.csv...")
 with open('data/hmdd_mpm.csv','r') as inFile:
    inFile.readline() # Get rid of header
    while 1:
@@ -260,14 +280,14 @@ with open('data/hmdd_mpm.csv','r') as inFile:
            break
        splitUp = inLine.strip().split(',')
        miR1 = miRNAInDict(splitUp[0],miRNAIDs)
-       print(splitUp[0],miR1)
+       # print(splitUp[0],miR1)
        for m1 in miR1:
            mp1 = MirnaPrior(
                mirna_id=miRNAs[m1].id, source='hmdd', description=splitUp[2], pmid=int(splitUp[1]))
            db.session.add(mp1)
 
-
 # Load dbDEMC
+print("dbDEMC.csv...")
 with open('data/dbDEMC.csv','r') as inFile:
    inFile.readline() # Get rid of header
    while 1:
@@ -276,7 +296,7 @@ with open('data/dbDEMC.csv','r') as inFile:
            break
        splitUp = inLine.strip().split(',')
        miR1 = miRNAInDict(splitUp[0].lower(),miRNAIDs)
-       print(splitUp[0],miR1)
+       # print(splitUp[0],miR1)
        for m1 in miR1:
            mp1 = MirnaPrior(
                mirna_id=miRNAs[m1].id, source='dbDEMC', description=splitUp[1], pmid=int(splitUp[2]))
@@ -293,7 +313,7 @@ def hallmark_name_to_csv_key(hallmark):
     return output
 
 # load up TfTargets
-'''
+print("humanTFs_All.csv...")
 with open("data/humanTFs_All.csv") as in_file:
     in_file.readline()  # consume headers
 
@@ -359,7 +379,6 @@ with open("data/humanTFs_All.csv") as in_file:
     # final commit
     print("committing {} tftarget entries, final commit...".format(entries_made))
     db.session.commit()
-'''
 
 # open up json file and start figuring out various miRNATargets
 def handle_miRNA_json(file_name, source_name):
@@ -410,8 +429,8 @@ def handle_miRNA_json(file_name, source_name):
     print("committing {} miRNA target entries ({}), final commit...".format(entries_made, source_name))
     db.session.commit()
 
-# handle_miRNA_json("targetScan_miRNA_sets_entrez_hsa.json", "Target Scan")
-# handle_miRNA_json("pita_miRNA_sets_entrez_hsa.json", "Pita")
+handle_miRNA_json("targetScan_miRNA_sets_entrez_hsa.json", "Target Scan")
+handle_miRNA_json("pita_miRNA_sets_entrez_hsa.json", "Pita")
 
 def parse_mutation_name(input):
     regex = re.compile(r"(X|x|)([0-9]+)_(.+)")
@@ -434,17 +453,36 @@ def parse_locus_name(input):
 somatic_mutations = {}
 locus_map = {}
 locus_array = []
-def interpret_causality_summary(filename, somatic_mutations):
+# code might be bad(?)
+def interpret_causality_summary(filename, bicluster_prefix, somatic_mutations):
     file = open(filename)
-    file.readline() # consume header
+
+    header = file.readline()
+    header_dict = {}
+    # make a dictionary of header -> column id names
+    header_split = header.strip().split(',')
+    index = 0
+    for header_name in header_split:
+        if header_name not in header_dict:
+            header_dict[header_name] = index
+        else: # handle duplicate names
+            suffix = 2
+            while "{}{}".format(header_name, suffix) in header_dict:
+                suffix = suffix + 1
+            
+            # for duplicate names, keep adding 1 to a suffix as long as the name is taken. once we find an untaken suffix, we will stop.
+            # for instance, a duplicate colmun Genes will become Genes2, and another duplicate of the same name will become Genes3
+            header_dict["{}{}".format(header_name, suffix)] = index
+        
+        index = index + 1
 
     line = file.readline()
     while line:
         split = line.split(",")
         
-        mutation = split[0]
-        regulator = split[1]
-        bicluster = split[2]
+        mutation = split[header_dict["Mutation"]]
+        regulator = split[header_dict["Regulator"]]
+        bicluster = split[header_dict["Bicluster"]]
 
         parsed = parse_mutation_name(mutation)
 
@@ -453,6 +491,7 @@ def interpret_causality_summary(filename, somatic_mutations):
             somatic_mutations[parsed[0]] = SomaticMutation( \
                 ext_id = genes[parsed[0]].id, \
                 mutation_type = parsed[1], \
+                mutation_name = mutation, \
             )
             db.session.add(somatic_mutations[parsed[0]])
         elif parsed:
@@ -483,6 +522,7 @@ def interpret_causality_summary(filename, somatic_mutations):
         if name not in somatic_mutations:
             somatic_mutations[name] = SomaticMutation( \
                 locus_id = locus.id, \
+                mutation_name = name, \
             )
             db.session.add(somatic_mutations[name])
     
@@ -494,29 +534,83 @@ def interpret_causality_summary(filename, somatic_mutations):
     file.readline()
 
     line = file.readline()
+    # code below is FOR SURE bad
     while line:
         split = line.split(",")
 
-        mutation = split[0][1:] # string name
-        regulator_entrez = int(split[1]) # entrez id
-        bicluster_entrez = int(split[2]) # entrez id
+        mutation = split[header_dict["Mutation"]]
+        parsed = parse_mutation_name(mutation)
 
-        print(bicluster_entrez)
-        print(mutation)
+        mirna_mimat = ""
+        tf_entrez = -1
+        if "MIMAT" in split[header_dict["Regulator"]]:
+            mirna_mimat = split[header_dict["Regulator"]]
+        else:
+            tf_entrez = int(split[header_dict["Regulator"]]) # entrez id for tf regulator
 
-        leo_nb_atob = float(split[3])
-        mlogp_m_atob = float(split[4])
+        if bicluster_prefix == "":
+            bicluster_name = split[header_dict["Bicluster"]]
+        else:
+            bicluster_number = int(split[header_dict["Bicluster"]]) # entrez id
+            # bicluster names are formated as so: (pita_|tfbs_db_|targetscan_)[0-9]+
+            # the bicluster_number variable holds the number at the end of the bicluster name
+            bicluster_name = "{}_{}".format(bicluster_prefix, bicluster_number)
 
-        if bicluster_entrez in biclusters and mutation in somatic_mutations:
-            causal_flow = CausalFlow(\
-                somatic_mutation_id = somatic_mutations[mutation].id, \
-                regulator_id = regulator_entrez, \
-                regulator_type = "", \
-                bicluster_id = biclusters[bicluster_entrez], \
-                leo_nb_atob = leo_nb_atob, \
-                mlogp_m_atob = mlogp_m_atob, \
-            )
-            db.session.add(causal_flow)
+        # print(bicluster_name, mirna_mimat, tf_entrez)
+
+        leo_nb_atob = float(split[header_dict["leo.nb.AtoB"]])
+        mlogp_m_atob = float(split[header_dict["mlogp.M.AtoB"]])
+
+        somatic_mutation = None
+        if parsed and parsed[0] in somatic_mutations:
+            somatic_mutation = somatic_mutations[parsed[0]]
+        else:
+            parsed_locus = parse_locus_name(mutation)
+            if parsed_locus:
+                real_name = "{}_{}".format(parsed_locus[0], parsed_locus[1])
+                if real_name in somatic_mutations:
+                    somatic_mutation = somatic_mutations[real_name]
+
+        # WARNING: biclusters holds NAMES, not ENTREZ
+        if bicluster_name in biclusters and somatic_mutation != None: # is it wrong here?
+            regulator_id = -1
+            regulator_type = ""
+
+            if tf_entrez != -1 and tf_entrez in genes:
+                tf_key = (biclusters[bicluster_name].id, genes[tf_entrez].id) # we need a bicluster id and a gene id to access the tf_regulators_dict
+                if tf_key in tf_regulators_dict:
+                    regulator_id = tf_regulators_dict[tf_key].id
+                    regulator_type = "tf"
+                else:
+                    print("could not find any regulators for the causal flow, bicluster {}, entrez {}, somatic mutation {}".format(bicluster_name, tf_entrez, somatic_mutation.mutation_name))
+            '''elif tf_entrez != -1:
+                print("regulator entrez {} not in regulators".format(tf_entrez))'''
+
+            if mirna_mimat != "" and mirna_mimat in miRNAs:
+                mirna_key = (biclusters[bicluster_name].id, miRNAs[mirna_mimat].id)
+                if mirna_key in mirna_regulators_dict:
+                    regulator_id = mirna_regulators_dict[key].id
+                    regulator_type = "mirna"
+                else:
+                    print("could not find any regulators for the causal flow, bicluster {}, MIMAT {}, somatic mutation {}".format(bicluster_name, mirna_mimat, somatic_mutation.mutation_name))
+            '''elif mirna_mimat != "":
+                print("regulator mimat {} not in regulators".format(mirna_mimat))'''
+            
+            if regulator_id != -1:
+                causal_flow = CausalFlow(\
+                    somatic_mutation_id = somatic_mutation.id, \
+                    regulator_id = regulator_id, \
+                    regulator_type = regulator_type, \
+                    bicluster_id = biclusters[bicluster_name].id, \
+                    leo_nb_atob = leo_nb_atob, \
+                    mlogp_m_atob = mlogp_m_atob, \
+                )
+                db.session.add(causal_flow)
+        else:
+            '''if bicluster_name not in biclusters:
+                print("could not find bicluster {} for causal flow".format(bicluster_name))
+            else:
+                print("could not find mutation {} for causal flow".format(mutation))'''
         
         line = file.readline()
 
@@ -600,6 +694,8 @@ with open('data/phenotypes_meso_noFilter.csv') as in_file:
     db.session.commit()
 
 biclusters = {}
+tf_regulators_dict = {}
+mirna_regulators_dict = {}
 with open('data/postProcessed_clustersOfBiclusters_CNA_CNVkit.csv') as in_file:
     # we need to cache the values so we can create the classes in order. we need to do this so the database can automatically complete the relationships defined in models.py
     bic_gene_values = []
@@ -638,19 +734,20 @@ with open('data/postProcessed_clustersOfBiclusters_CNA_CNVkit.csv') as in_file:
         bicluster_name = split[header_dict["bicluster"]]
 
         # create a bicluster
-        bicluster = Bicluster( \
-            name = bicluster_name, \
-            var_exp_fpc = split[header_dict["Var. Exp. First PC"]], \
-            var_exp_fpc_p_value = split[header_dict["Var. Exp. First PC Perm. P-Value"]], \
-            survival = split[header_dict["OS.covAgeSex"]], \
-            survival_p_value = split[header_dict["OS.covAgeSex.p"]] \
-        )
-        db.session.add(bicluster)
+        if bicluster_name not in biclusters:
+            bicluster = Bicluster( \
+                name = bicluster_name, \
+                var_exp_fpc = split[header_dict["Var. Exp. First PC"]], \
+                var_exp_fpc_p_value = split[header_dict["Var. Exp. First PC Perm. P-Value"]], \
+                survival = split[header_dict["OS.covAgeSex"]], \
+                survival_p_value = split[header_dict["OS.covAgeSex.p"]] \
+            )
+            db.session.add(bicluster)
 
-        biclusters[bicluster_name] = bicluster
+            biclusters[bicluster_name] = bicluster
         
         # create a BicGene
-        bic_gene_values.append((bicluster_name, int(split[header_dict["Genes"]])))
+        bic_gene_values.append((bicluster_name, split[header_dict["Genes2"]])) # fix, should be split by spaces
 
         # create a BicGo
         bic_go_values.append((bicluster_name, split[header_dict["GO_Term_BP"]]))
@@ -698,7 +795,7 @@ with open('data/postProcessed_clustersOfBiclusters_CNA_CNVkit.csv') as in_file:
         target_scan_miRNA = parse_miRNA_array(bicluster_name, split[header_dict["3pUTR_targetScan.miRNAs"]])
         if target_scan_miRNA != None:
             miRNA_regulators.append(target_scan_miRNA)
-
+        
         # figure out all the different hallmarks (there's a ton of them)
         for hallmark in hallmark_names:
             csv_key = hallmark_name_to_csv_key(hallmark)
@@ -715,15 +812,29 @@ with open('data/postProcessed_clustersOfBiclusters_CNA_CNVkit.csv') as in_file:
     for tuple_val in bic_gene_values:       
         if tuple_val[0] not in biclusters:
             print("bic_gene warning: could not find bicluster name {}".format(tuple_val[0]))
+        else:
+            split = tuple_val[1].split(" ")
+            for entrez in split:
+                entrez = int(entrez)
+                if entrez not in genes:
+                    print("bic_gene warning: could not find gene id {}".format(entrez))
+                else:
+                    db.session.add(BicGene( \
+                        bicluster_id = biclusters[tuple_val[0]].id, \
+                        gene_id = genes[entrez].id \
+                    ))
+
+        '''
         elif tuple_val[1] not in genes:
-            print("bic_gene warning: could not find gene id {}".format(tuple_val[1]))
+            print("bic_gene warning: could not find gene id {}".format(tuple_val[1])) # report: sometimes a gene just cannot be associated with a bicluster, which screws with results in the search. what to do?
         else:
             db.session.add(BicGene( \
                 bicluster_id = biclusters[tuple_val[0]].id, \
                 gene_id = genes[tuple_val[1]].id \
             ))
+        '''
     
-    # create all the BicGo's
+    # create all the BicGos
     for tuple_val in bic_go_values:
         if tuple_val[1] != "NA":
             split = tuple_val[1].split(";")
@@ -742,7 +853,7 @@ with open('data/postProcessed_clustersOfBiclusters_CNA_CNVkit.csv') as in_file:
                 patient_id = patients[patient].id \
             ))
 
-    # create all the BicHal's
+    # create all the BicHals
     for tuple_val in bic_halmark_values:
         bicluster_name = tuple_val[0]
         hallmark_name = tuple_val[1]
@@ -754,7 +865,7 @@ with open('data/postProcessed_clustersOfBiclusters_CNA_CNVkit.csv') as in_file:
                 hallmark_id = hallmarks[hallmark_name].id \
             ))
     
-    # create all the Replication's
+    # create all the Replications
     for tuple_val in replication_values:
         bicluster_name = tuple_val[0]
         var_exp_fpc = tuple_val[1]
@@ -776,12 +887,17 @@ with open('data/postProcessed_clustersOfBiclusters_CNA_CNVkit.csv') as in_file:
         bicluster_name = tf_regulator_array[0]
         for index in range(1, len(tf_regulator_array)):
             tf_regulator = tf_regulator_array[index]
-            db.session.add(TfRegulator( \
-                bicluster_id = biclusters[bicluster_name].id, \
-                tf_id = genes[tf_regulator[0]].id, \
-                r_value = tf_regulator[1], \
-                p_value = tf_regulator[2], \
-            ))
+            key = (biclusters[bicluster_name].id, genes[tf_regulator[0]].id)
+            if key not in tf_regulators_dict: # have to add this so we do not add duplicate tf regulator entries
+                regulator_object = TfRegulator( \
+                    bicluster_id = biclusters[bicluster_name].id, \
+                    tf_id = genes[tf_regulator[0]].id, \
+                    r_value = tf_regulator[1], \
+                    p_value = tf_regulator[2], \
+                )
+                key = (biclusters[bicluster_name].id, genes[tf_regulator[0]].id)
+                tf_regulators_dict[key] = regulator_object
+                db.session.add(regulator_object)
     
     # create all miRNA regulators
     for miRNA_regulator_array in miRNA_regulators:
@@ -790,17 +906,27 @@ with open('data/postProcessed_clustersOfBiclusters_CNA_CNVkit.csv') as in_file:
             mimat = miRNA_regulator_array[index]
             if mimat in miRNAs:
                 miRNA_entry = miRNAs[mimat]
-                db.session.add(MirnaRegulator(
-                    bicluster_id = biclusters[bicluster_name].id, \
-                    mirna_id = miRNA_entry.id, \
-                ))
+                key = (biclusters[bicluster_name].id, miRNA_entry.id)
+                if key not in mirna_regulators_dict: # have to make sure we don't add duplicate mirna regulator entries
+                    regulator_object = MirnaRegulator(
+                        bicluster_id = biclusters[bicluster_name].id, \
+                        mirna_id = miRNA_entry.id, \
+                    )
+                    mirna_regulators_dict[key] = regulator_object
+                    db.session.add(regulator_object)
             else:
                 print("missing MIMAT {}, can't link to bicluster table".format(mimat))
-    
+
+    print("committing post processed biclusters...")
     db.session.commit()
+    print("committed")
 
 
 # handle somatic mutations and causal flows
-# interpret_causality_summary("./data/causality_CNA_final_8_13_2019/causalitySummary_pita.csv", somatic_mutations)
-# interpret_causality_summary("./data/causality_CNA_final_8_13_2019/causalitySummary_targetscan.csv", somatic_mutations)
-# interpret_causality_summary("./data/causality_CNA_final_8_13_2019/causalitySummary_tfbs_db.csv", somatic_mutations)
+interpret_causality_summary("./data/causality_CNA_final_8_13_2019/causalitySummary_pita.csv", "pita", somatic_mutations)
+interpret_causality_summary("./data/causality_CNA_final_8_13_2019/causalitySummary_targetscan.csv", "targetscan", somatic_mutations)
+interpret_causality_summary("./data/causality_CNA_final_8_13_2019/causalitySummary_tfbs_db.csv", "tfbs_db", somatic_mutations)
+
+interpret_causality_summary("./data/causal_v9/summaryCausality_CNV_8_16_2019_0.3_0.05_cleanedUp.csv", "", somatic_mutations)
+
+print("program took {} seconds to complete".format(time.time() - start_time))
