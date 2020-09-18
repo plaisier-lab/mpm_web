@@ -134,6 +134,8 @@ CREATE TABLE mirna_regulator (
     id integer unsigned NOT NULL AUTO_INCREMENT,
     bicluster_id integer unsigned,
     mirna_id integer unsigned,
+    r_value float,
+    p_value float,
     PRIMARY KEY (id),
     FOREIGN KEY (bicluster_id) REFERENCES bicluster (id),
     FOREIGN KEY (mirna_id) REFERENCES mirna (id)

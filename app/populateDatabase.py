@@ -171,7 +171,7 @@ db.session.commit()
 
 # Load up gene expression data
 gene_expression_count = 0
-for patient1 in gexp1.columns:
+'''for patient1 in gexp1.columns:
     for gene1 in gexp1.index:
         if gene1 in genes:
             ge1 = GeneExpression(
@@ -183,7 +183,7 @@ for patient1 in gexp1.columns:
             print("committing {} gene expressions...".format(gene_expression_count))
             db.session.commit()
             gene_expression_count = 0
-db.session.commit()
+db.session.commit()'''
 
 # Add hallmarks of Cancer
 hallmark_names = ['Sustained angiogenesis', 'Insensitivity to antigrowth signals', 'Evading apoptosis', 'Limitless replicative potential', 'Evading immune detection',
@@ -313,6 +313,7 @@ def hallmark_name_to_csv_key(hallmark):
     return output
 
 # load up TfTargets
+'''
 print("humanTFs_All.csv...")
 with open("data/humanTFs_All.csv") as in_file:
     in_file.readline()  # consume headers
@@ -379,6 +380,7 @@ with open("data/humanTFs_All.csv") as in_file:
     # final commit
     print("committing {} tftarget entries, final commit...".format(entries_made))
     db.session.commit()
+'''
 
 # open up json file and start figuring out various miRNATargets
 def handle_miRNA_json(file_name, source_name):
@@ -429,8 +431,8 @@ def handle_miRNA_json(file_name, source_name):
     print("committing {} miRNA target entries ({}), final commit...".format(entries_made, source_name))
     db.session.commit()
 
-handle_miRNA_json("targetScan_miRNA_sets_entrez_hsa.json", "Target Scan")
-handle_miRNA_json("pita_miRNA_sets_entrez_hsa.json", "Pita")
+'''handle_miRNA_json("targetScan_miRNA_sets_entrez_hsa.json", "Target Scan")
+handle_miRNA_json("pita_miRNA_sets_entrez_hsa.json", "Pita")'''
 
 def parse_mutation_name(input):
     regex = re.compile(r"(X|x|)([0-9]+)_(.+)")
@@ -578,9 +580,9 @@ def interpret_causality_summary(filename, bicluster_prefix, somatic_mutations):
 
             if tf_entrez != -1 and tf_entrez in genes:
                 tf_key = (biclusters[bicluster_name].id, genes[tf_entrez].id) # we need a bicluster id and a gene id to access the tf_regulators_dict
+                regulator_type = "tf"
                 if tf_key in tf_regulators_dict:
                     regulator_id = tf_regulators_dict[tf_key].id
-                    regulator_type = "tf"
                 else:
                     print("could not find any regulators for the causal flow, bicluster {}, entrez {}, somatic mutation {}".format(bicluster_name, tf_entrez, somatic_mutation.mutation_name))
             '''elif tf_entrez != -1:
@@ -588,9 +590,9 @@ def interpret_causality_summary(filename, bicluster_prefix, somatic_mutations):
 
             if mirna_mimat != "" and mirna_mimat in miRNAs:
                 mirna_key = (biclusters[bicluster_name].id, miRNAs[mirna_mimat].id)
+                regulator_type = "mirna"
                 if mirna_key in mirna_regulators_dict:
                     regulator_id = mirna_regulators_dict[key].id
-                    regulator_type = "mirna"
                 else:
                     print("could not find any regulators for the causal flow, bicluster {}, MIMAT {}, somatic mutation {}".format(bicluster_name, mirna_mimat, somatic_mutation.mutation_name))
             '''elif mirna_mimat != "":
@@ -902,12 +904,17 @@ with open('data/postProcessed_clustersOfBiclusters_CNA_CNVkit.csv') as in_file:
     # create all miRNA regulators
     for miRNA_regulator_array in miRNA_regulators:
         bicluster_name = miRNA_regulator_array[0]
+        print("MIRNA REGULATORS:")
+        print(bicluster_name)
         for index in range(1, len(miRNA_regulator_array)):
             mimat = miRNA_regulator_array[index]
+            print(mimat)
             if mimat in miRNAs:
                 miRNA_entry = miRNAs[mimat]
                 key = (biclusters[bicluster_name].id, miRNA_entry.id)
+                print(key)
                 if key not in mirna_regulators_dict: # have to make sure we don't add duplicate mirna regulator entries
+                    print("added")
                     regulator_object = MirnaRegulator(
                         bicluster_id = biclusters[bicluster_name].id, \
                         mirna_id = miRNA_entry.id, \
@@ -927,6 +934,6 @@ interpret_causality_summary("./data/causality_CNA_final_8_13_2019/causalitySumma
 interpret_causality_summary("./data/causality_CNA_final_8_13_2019/causalitySummary_targetscan.csv", "targetscan", somatic_mutations)
 interpret_causality_summary("./data/causality_CNA_final_8_13_2019/causalitySummary_tfbs_db.csv", "tfbs_db", somatic_mutations)
 
-interpret_causality_summary("./data/causal_v9/summaryCausality_CNV_8_16_2019_0.3_0.05_cleanedUp.csv", "", somatic_mutations)
+("./data/causal_v9/summaryCausality_CNV_8_16_2019_0.3_0.05_cleanedUp.csv", "", somatic_mutations)
 
 print("program took {} seconds to complete".format(time.time() - start_time))

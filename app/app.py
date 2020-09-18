@@ -535,7 +535,7 @@ WHERE bic_go.bicluster_id=%s""", [bc_pk])
         "median": item[3],
         "q3": item[4],
         "high": item[5],
-        "fillColor": "%sAA" % GRAPH_COLOR_MAP[ptmap[patients[i]]], # get the color and append a transparency value
+        "fillColor": "%sB3" % GRAPH_COLOR_MAP[ptmap[patients[i]]], # get the color and append a transparency value
     } for i, item in enumerate(all_boxplot_data)]
     
     # perc20 = len(in_data) / 5
