@@ -444,7 +444,7 @@ def parse_mutation_name(input):
         return None
 
 def parse_locus_name(input):
-    regex = re.compile(r"(X|x|)(.*)_(.*)")
+    regex = re.compile(r"(X|x|)([^\s]+)_([A-Za-z]+)")
     match = regex.match(input)
 
     if match:
@@ -512,7 +512,7 @@ def interpret_sif(filename):
 somatic_mutations = {}
 locus_map = {}
 locus_array = []
-def interpret_causality_summary(filename, bicluster_prefix, somatic_mutations):
+def interpret_causality_summary(filename, bicluster_prefix):
     file = open(filename)
     header = file.readline()
 
@@ -525,53 +525,72 @@ def interpret_causality_summary(filename, bicluster_prefix, somatic_mutations):
         bicluster = int(split[2]) # digits at end of bicluster name
         leo_nb_atob = float(split[3])
         mlogp_m_atob = float(split[4])
-
-        if mutation != None:
-            regulator_bicluster_to_id[(regulator, bicluster)] = (mutation, leo_nb_atob, mlogp_m_atob)
-
         line = file.readline()
+
+        # we found tf mutation
+        if mutation != None:
+            regulator_bicluster_to_id[(regulator, bicluster)] = (mutation, leo_nb_atob, mlogp_m_atob, False)
+            continue
+            
+        mutation = parse_locus_name(split[0])
+        # we found locus mutation
+        if mutation != None:
+            regulator_bicluster_to_id[(regulator, bicluster)] = (mutation, leo_nb_atob, mlogp_m_atob, True)
+            continue
     
     # go through every regulator/bicluster combination
     for regulator, linked_biclusters in sif_regulator_to_biclusters.items():
         for bicluster in linked_biclusters:
             key = (regulator, bicluster)
+            print(key)
             if key in regulator_bicluster_to_id: # we know we have a full unambiguous path if we find ourselves in here
-                mutation, leo_nb_atob, mlogp_m_atob = regulator_bicluster_to_id[key]
+                mutation, leo_nb_atob, mlogp_m_atob, is_locus = regulator_bicluster_to_id[key]
                 mutation_name = "{}_{}".format(mutation[0], mutation[1])
                 bicluster_name = "{}_{}".format(bicluster_prefix, bicluster)
 
                 if bicluster_name not in biclusters:
-                    print("causal flow bicluster not found")
                     continue
                 
                 bicluster_id = biclusters[bicluster_name].id
                 regulator_key = (bicluster_id, genes[regulator].id)
 
                 if regulator_key not in tf_regulators_dict:
-                    print("causal flow regulator not found")
                     continue
 
                 regulator_id = tf_regulators_dict[regulator_key].id
                 # print("linked " + str(regulator) + " " + str(bicluster) + " to mutation " + str(regulator_bicluster_to_id[key]))
 
                 # create somatic mutation if we don't have one
-                if mutation[0] in genes:
+                if mutation[0] in genes and is_locus == False and mutation_name not in somatic_mutations:
                     somatic_mutations[mutation_name] = SomaticMutation(
                         ext_id = genes[mutation[0]].id,
+                        mutation_type = mutation[1], # PAM, LoF, etc
+                        mutation_name = mutation_name,
+                    )
+                    db.session.add(somatic_mutations[mutation_name])
+                    db.session.commit()
+                elif is_locus == True and mutation_name not in locus_map and mutation_name not in somatic_mutations: # create locus and somatic mmutation if we don't have one
+                    locus_map[mutation_name] = Locus(
+                        locus_name = mutation[0],
                         mutation_type = mutation[1],
+                    )
+                    db.session.add(locus_map[mutation_name])
+                    db.session.commit()
+
+                    somatic_mutations[mutation_name] = SomaticMutation(
+                        locus_id = locus_map[mutation_name].id,
                         mutation_name = mutation_name,
                     )
                     db.session.add(somatic_mutations[mutation_name])
                     db.session.commit()
                 
                 if mutation_name not in somatic_mutations:
-                    print("causal flow regulator not found")
                     continue
 
                 causal_flow = CausalFlow(
                     somatic_mutation_id = somatic_mutations[mutation_name].id,
                     regulator_id = regulator_id,
-                    regulator_type = "tf",
+                    regulator_type = "tf", # tf or miRNA
                     bicluster_id = bicluster_id,
                     leo_nb_atob = leo_nb_atob,
                     mlogp_m_atob = mlogp_m_atob,
@@ -1053,9 +1072,9 @@ with open('data/postProcessed_clustersOfBiclusters_CNA_CNVkit.csv') as in_file:
 
 # handle somatic mutations and causal flows
 interpret_sif("./data/sifs/causalAndMechanistic_network_CNA_CNVkit_8_13_2019.sif")
-interpret_causality_summary("./data/causality_CNA_final_8_13_2019/causalitySummary_pita.csv", "pita", somatic_mutations)
-interpret_causality_summary("./data/causality_CNA_final_8_13_2019/causalitySummary_targetscan.csv", "targetscan", somatic_mutations)
-interpret_causality_summary("./data/causality_CNA_final_8_13_2019/causalitySummary_tfbs_db.csv", "tfbs_db", somatic_mutations)
+interpret_causality_summary("./data/causality_CNA_final_8_13_2019/causalitySummary_pita.csv", "pita")
+interpret_causality_summary("./data/causality_CNA_final_8_13_2019/causalitySummary_targetscan.csv", "targetscan")
+interpret_causality_summary("./data/causality_CNA_final_8_13_2019/causalitySummary_tfbs_db.csv", "tfbs_db")
 
 ("./data/causal_v9/summaryCausality_CNV_8_16_2019_0.3_0.05_cleanedUp.csv", "", somatic_mutations)
 
