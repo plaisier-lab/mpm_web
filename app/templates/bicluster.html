@@ -32,6 +32,25 @@
         top: 0px;
         float: left;
       }
+
+      .hallmark-container {
+				position: relative;
+			}
+
+      .hallmark-container img {
+				width: 100%;
+			}
+
+			.hallmark-container img:not(:first-child) {
+				position: absolute;
+				top: 0;
+				left: 0;
+			}
+
+			.hallmark-container img.disabled {
+				opacity: 0.3;
+        filter: grayscale(100%);
+			}
     </style>
 
     <!-- Javascript to modify tables -->
@@ -400,7 +419,24 @@
             {% endfor %}
         </ul></td>
         <td><div class="container-fluid" style="margin-left: 15px;"></div></td>
-        <td align='center'><span style='color:#f00;font-weight:bold;font-size:14pt;'>Legend:</span><br>&nbsp;<br><img src='/static/images/legend.jpg' alt='Hallmarks of Cancer' width=300><br><small><a href='http://www.ncbi.nlm.nih.gov/pubmed/21376230'>Hanahan and Weinberg, Cell 2011</a></small></td>
+        <td align='center'>
+          <span style='color:#f00;font-weight:bold;font-size:14pt;'>Legend:</span>
+          <br>&nbsp;<br>
+          <div class="hallmark-container" style="width: 300px;">
+            <img src="/static/images/hallmarks.png" />`
+            <img class="{{hallmark_image_class[1]}}" src="/static/images/hallmark 1.png" />
+            <img class="{{hallmark_image_class[2]}}" src="/static/images/hallmark 2.png" />
+            <img class="{{hallmark_image_class[3]}}" src="/static/images/hallmark 3.png" />
+            <img class="{{hallmark_image_class[4]}}" src="/static/images/hallmark 4.png" />
+            <img class="{{hallmark_image_class[5]}}" src="/static/images/hallmark 5.png" />
+            <img class="{{hallmark_image_class[6]}}" src="/static/images/hallmark 6.png" />
+            <img class="{{hallmark_image_class[7]}}" src="/static/images/hallmark 7.png" />
+            <img class="{{hallmark_image_class[8]}}" src="/static/images/hallmark 8.png" />
+            <img class="{{hallmark_image_class[9]}}" src="/static/images/hallmark 9.png" />
+            <img class="{{hallmark_image_class[10]}}" src="/static/images/hallmark 10.png" />
+          </div>
+          <br><small><a href='http://www.ncbi.nlm.nih.gov/pubmed/21376230'>Hanahan and Weinberg, Cell 2011</a></small>
+        </td>
       </tr>
     </table>
   </div>

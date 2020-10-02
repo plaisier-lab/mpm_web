@@ -484,10 +484,35 @@ FROM causal_flow WHERE bicluster_id=%s""", [bc_pk])
     c.execute("""SELECT hm.id,hm.name FROM hallmark hm join bic_hal bh on hm.id=bh.hallmark_id
 WHERE bh.bicluster_id=%s""", [bc_pk])
     hallmarks = []
+    hallmark_to_image = {
+        "Sustained angiogenesis": 5,
+        "Insensitivity to antigrowth signals": 10,
+        "Evading apoptosis": 3,
+        "Evading immune detection": 9,
+        "Tissue invasion and metastasis": 6,
+        "Self sufficiency in growth signals": 1,
+        "Tumor promoting inflammation": 7,
+        "Reprogramming energy metabolism": 2,
+        "Genome instability and mutation": 4,
+        "Limitless replicative potential": 8,
+    }
+    hallmark_image_class = {
+        1: "disabled",
+        2: "disabled",
+        3: "disabled",
+        4: "disabled",
+        5: "disabled",
+        6: "disabled",
+        7: "disabled",
+        8: "disabled",
+        9: "disabled",
+        10: "disabled",
+    }
     for hm_id, hm_name in c.fetchall():
         hallmarks.append([hm_name, convert[hm_name] ])
         elements.append({'data': { 'id': 'hm%d' % hm_id, 'name': hm_name}, 'classes': 'hallmark' })
         elements.append({'data': { 'id': 'bchm%d' % hm_id, 'source': 'bc%d' % bc_pk, 'target': 'hm%d' % hm_id } })
+        hallmark_image_class[hallmark_to_image[hm_name]] = ""
 
     # GO
     c.execute("""SELECT go_bp.id, go_bp.go_id, go_bp.name FROM bic_go join go_bp on go_bp.id=bic_go.go_bp_id
