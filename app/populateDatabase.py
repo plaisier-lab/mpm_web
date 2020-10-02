@@ -223,19 +223,19 @@ with open('data/go.obo', 'r') as inFile:
 db.session.commit()
 
 # Gene -> GO_BP
-# print("gene2go.hsa...")
-# with open('data/gene2go.hsa', 'r') as inFile:
-#     while 1:
-#         line = inFile.readline()
-#         if not line:
-#             break
-#         splitUp = line.strip().split('\t')
-#         if int(splitUp[1]) in genes and splitUp[2] in geneOntology:
-#             gg1 = GoGene(
-#                 go_bp_id=geneOntology[splitUp[2]].id, gene_id=genes[int(splitUp[1])].id)
-#             db.session.add(gg1)
+print("gene2go.hsa...")
+with open('data/gene2go.hsa', 'r') as inFile:
+    while 1:
+        line = inFile.readline()
+        if not line:
+            break
+        splitUp = line.strip().split('\t')
+        if int(splitUp[1]) in genes and splitUp[2] in geneOntology:
+            gg1 = GoGene(
+                go_bp_id=geneOntology[splitUp[2]].id, gene_id=genes[int(splitUp[1])].id)
+            db.session.add(gg1)
 
-# db.session.commit()
+db.session.commit()
 
 # miRNAs
 print("miRNAs...")
@@ -743,6 +743,29 @@ with open('data/phenotypes_meso_noFilter.csv') as in_file:
     
     db.session.commit()
 
+def read_eigengenes(filename, prefix):
+    eigengenes = pd.read_csv(filename, header=0, index_col=0)
+    eigengene_count = 0
+    for patient in eigengenes.columns:
+        old_patient = patient
+        if patient[0].lower() == "x":
+            patient = patient[1:]
+        for bicluster_number in eigengenes.index:
+            bicluster_name = "{}_{}".format(prefix, bicluster_number)
+            if bicluster_name in biclusters and patient in patients:
+                eigengene = Eigengene(
+                    patient_id = patients[patient].id,
+                    bicluster_id = biclusters[bicluster_name].id,
+                    value = float(eigengenes[old_patient][bicluster_number]))
+                db.session.add(eigengene)
+                eigengene_count = eigengene_count + 1
+            
+            if eigengene_count > 200000:
+                print("committing {} eigengenes...".format(eigengene_count))
+                db.session.commit()
+                eigengene_count = 0
+    db.session.commit()
+
 biclusters = {}
 tf_regulators_dict = {}
 mirna_regulators_dict = {}
@@ -974,10 +997,15 @@ with open('data/postProcessed_clustersOfBiclusters_CNA_CNVkit.csv') as in_file:
 
 # handle somatic mutations and causal flows
 interpret_sif("./data/sifs/causalAndMechanistic_network_CNA_CNVkit_8_13_2019.sif")
-interpret_causality_summary("./data/causality_CNA_final_8_13_2019/causalitySummary_pita.csv", "pita")
-interpret_causality_summary("./data/causality_CNA_final_8_13_2019/causalitySummary_targetscan.csv", "targetscan")
-interpret_causality_summary("./data/causality_CNA_final_8_13_2019/causalitySummary_tfbs_db.csv", "tfbs_db")
-interpret_causality_summary("./data/causal_v9/summaryCausality_CNV_8_16_2019_0.3_0.05_cleanedUp.csv", None)
+# interpret_causality_summary("./data/causality_CNA_final_8_13_2019/causalitySummary_pita.csv", "pita")
+# interpret_causality_summary("./data/causality_CNA_final_8_13_2019/causalitySummary_targetscan.csv", "targetscan")
+# interpret_causality_summary("./data/causality_CNA_final_8_13_2019/causalitySummary_tfbs_db.csv", "tfbs_db")
+# interpret_causality_summary("./data/causal_v9/summaryCausality_CNV_8_16_2019_0.3_0.05_cleanedUp.csv", None)
+
+# handle eigengenes
+read_eigengenes("./data/eigengenes/biclusterEigengenes_pita.csv", "pita")
+read_eigengenes("./data/eigengenes/biclusterEigengenes_targetscan.csv", "targetscan")
+read_eigengenes("./data/eigengenes/biclusterEigengenes_tfbs_db.csv", "tfbs_db")
 
 ("./data/causal_v9/summaryCausality_CNV_8_16_2019_0.3_0.05_cleanedUp.csv", "", somatic_mutations)
 

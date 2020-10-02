@@ -295,3 +295,15 @@ class Locus(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     locus_name = db.Column(db.String(10))
     mutation_type = db.Column(db.String(10))
+
+# used
+class Eigengene(db.Model):
+    __tablename__ = 'eigengene'
+
+    id = db.Column(db.Integer, primary_key=True)
+    patient_id = db.Column(db.ForeignKey('patient.id'), index=True)
+    bicluster_id = db.Column(db.ForeignKey('bicluster.id'), index=True)
+    value = db.Column(db.Float)
+
+    bicluster = db.relationship('Bicluster', primaryjoin='Eigengene.bicluster_id == Bicluster.id', backref='eigengene')
+    patient = db.relationship('Patient', primaryjoin='Eigengene.patient_id == Patient.id', backref='eigengene')

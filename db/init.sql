@@ -249,3 +249,14 @@ CREATE TABLE mirna_expression (
     FOREIGN KEY (patient_id) REFERENCES patient (id),
     FOREIGN KEY (mirna_id) REFERENCES mirna (id)
 );
+
+CREATE TABLE eigengene (
+    id integer unsigned NOT NULL AUTO_INCREMENT,
+    bicluster_id integer unsigned,
+    patient_id integer unsigned,
+    value float(23),
+
+    PRIMARY KEY (id),
+    FOREIGN KEY (bicluster_id) REFERENCES bicluster (id),
+    FOREIGN KEY (patient_id) REFERENCES patient (id)
+)
