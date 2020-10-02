@@ -143,6 +143,10 @@
           chart: {type: 'column', alignTicks: false}, 
           title: {text: ''},
           xAxis: {
+            tickLength: 0,
+            labels: {
+              enabled: false,
+            },
             plotLines: [
               {
                 value: {{enrich_quintiles[0]}},
