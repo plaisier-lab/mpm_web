@@ -171,7 +171,7 @@ db.session.commit()
 
 # Load up gene expression data
 gene_expression_count = 0
-'''for patient1 in gexp1.columns:
+for patient1 in gexp1.columns:
     for gene1 in gexp1.index:
         if gene1 in genes:
             ge1 = GeneExpression(
@@ -183,7 +183,7 @@ gene_expression_count = 0
             print("committing {} gene expressions...".format(gene_expression_count))
             db.session.commit()
             gene_expression_count = 0
-db.session.commit()'''
+db.session.commit()
 
 # Add hallmarks of Cancer
 hallmark_names = ['Sustained angiogenesis', 'Insensitivity to antigrowth signals', 'Evading apoptosis', 'Limitless replicative potential', 'Evading immune detection',
@@ -313,7 +313,6 @@ def hallmark_name_to_csv_key(hallmark):
     return output
 
 # load up TfTargets
-'''
 print("humanTFs_All.csv...")
 with open("data/humanTFs_All.csv") as in_file:
     in_file.readline()  # consume headers
@@ -380,7 +379,6 @@ with open("data/humanTFs_All.csv") as in_file:
     # final commit
     print("committing {} tftarget entries, final commit...".format(entries_made))
     db.session.commit()
-'''
 
 # open up json file and start figuring out various miRNATargets
 def handle_miRNA_json(file_name, source_name):
@@ -431,8 +429,8 @@ def handle_miRNA_json(file_name, source_name):
     print("committing {} miRNA target entries ({}), final commit...".format(entries_made, source_name))
     db.session.commit()
 
-'''handle_miRNA_json("targetScan_miRNA_sets_entrez_hsa.json", "Target Scan")
-handle_miRNA_json("pita_miRNA_sets_entrez_hsa.json", "Pita")'''
+handle_miRNA_json("targetScan_miRNA_sets_entrez_hsa.json", "Target Scan")
+handle_miRNA_json("pita_miRNA_sets_entrez_hsa.json", "Pita")
 
 def parse_mutation_name(input):
     regex = re.compile(r"(X|x|)([0-9]+)_(.+)")
@@ -997,10 +995,10 @@ with open('data/postProcessed_clustersOfBiclusters_CNA_CNVkit.csv') as in_file:
 
 # handle somatic mutations and causal flows
 interpret_sif("./data/sifs/causalAndMechanistic_network_CNA_CNVkit_8_13_2019.sif")
-# interpret_causality_summary("./data/causality_CNA_final_8_13_2019/causalitySummary_pita.csv", "pita")
-# interpret_causality_summary("./data/causality_CNA_final_8_13_2019/causalitySummary_targetscan.csv", "targetscan")
-# interpret_causality_summary("./data/causality_CNA_final_8_13_2019/causalitySummary_tfbs_db.csv", "tfbs_db")
-# interpret_causality_summary("./data/causal_v9/summaryCausality_CNV_8_16_2019_0.3_0.05_cleanedUp.csv", None)
+interpret_causality_summary("./data/causality_CNA_final_8_13_2019/causalitySummary_pita.csv", "pita")
+interpret_causality_summary("./data/causality_CNA_final_8_13_2019/causalitySummary_targetscan.csv", "targetscan")
+interpret_causality_summary("./data/causality_CNA_final_8_13_2019/causalitySummary_tfbs_db.csv", "tfbs_db")
+interpret_causality_summary("./data/causal_v9/summaryCausality_CNV_8_16_2019_0.3_0.05_cleanedUp.csv", None)
 
 # handle eigengenes
 read_eigengenes("./data/eigengenes/biclusterEigengenes_pita.csv", "pita")
