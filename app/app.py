@@ -399,7 +399,7 @@ FROM bicluster WHERE name=%s""", [bicluster])
 
     regulators = []
     # c.execute("""SELECT g.id, g.symbol, tfr.action FROM tf_regulator tfr join gene g on tfr.gene_id=g.id WHERE tfr.bicluster_id=%s""", [bc_pk])
-    c.execute("""SELECT g.id, g.symbol, tfr.r_value FROM tf_regulator tfr join gene g on tfr.tf_id=g.id WHERE tfr.bicluster_id=%s""", [bc_pk])
+    c.execute("""SELECT tfr.id, g.symbol, tfr.r_value FROM tf_regulator tfr join gene g on tfr.tf_id=g.id WHERE tfr.bicluster_id=%s""", [bc_pk])
     tfs = list(c.fetchall())
     tfList = []
     for tf in tfs:
