@@ -18,6 +18,24 @@
 ## mention who built it. Thanks. :-)                    ##
 ##########################################################
 
+# SELECT COUNT(*) FROM gene_expression ge JOIN gene g ON ge.gene_id = g.id JOIN tf_regulator tf ON tf.tf_id = g.id JOIN causal_flow cf ON cf.regulator_id = tf.id AND cf.regulator_type = "tf" JOIN bueno_deep_filter b ON b.somatic_mutation_id = cf.somatic_mutation_id WHERE b.value = 1;
+
+'''
+SELECT ge.value, cf.somatic_mutation_id, tf.id, b.id FROM gene_expression ge
+    JOIN gene g ON ge.gene_id = g.id
+    JOIN tf_regulator tf ON tf.tf_id = g.id
+    JOIN causal_flow cf ON cf.regulator_id = tf.id AND cf.regulator_type = "tf"
+    JOIN bicluster b ON cf.bicluster_id = b.id
+    JOIN bueno_deep_filter bd ON bd.somatic_mutation_id = cf.somatic_mutation_id AND bd.patient_id = ge.patient_id
+    WHERE cf.somatic_mutation_id = 8 AND tf.id = 3127 AND b.id = 355 AND bd.value = 1;
+
+SELECT e.value FROM eigengene e
+    JOIN bicluster b ON e.bicluster_id = b.id
+    JOIN causal_flow cf ON cf.bicluster_id = b.id
+    JOIN bueno_deep_filter bd ON bd.somatic_mutation_id = cf.somatic_mutation_id AND bd.patient_id = e.patient_id
+    WHERE cf.somatic_mutation_id = 8 AND cf.regulator_id = 3127 AND cf.regulator_type = "tf" AND b.id = 355 AND bd.value = 1;
+'''
+
 import re
 import cPickle
 import os
@@ -142,17 +160,19 @@ with open('data/hsa.mature.fa', 'r') as inFile:
 
 # Load up Genentech Gene Expression dataset
 
-print("mesothelioma_norm.txt...")
+print("mesothelioma_norm.csv...")
 # Read in gene expression matrix (Genentech)
-gexp1 = pd.read_csv('data/mesothelioma_norm.txt',
-                    header=0, index_col=0, sep=' ')
+gexp1 = pd.read_csv('data/mesothelioma_norm.csv',
+                    header=0, index_col=0, sep=',')
 
 # Load up patient information (Genentech)
 patients = {}
+patient_check = re.compile('M?[0-9]+PT')
 for patient1 in gexp1.columns:
-    p1 = Patient(name=patient1)
-    db.session.add(p1)
-    patients[patient1] = p1
+    if patient_check.match(patient1):
+        p1 = Patient(name=patient1)
+        db.session.add(p1)
+        patients[patient1] = p1
 
 # Load up gene information (Genentech)
 genes = {}
@@ -173,7 +193,7 @@ db.session.commit()
 gene_expression_count = 0
 for patient1 in gexp1.columns:
     for gene1 in gexp1.index:
-        if gene1 in genes:
+        if gene1 in genes and patient_check.match(patient1):
             ge1 = GeneExpression(
                 exp_dataset_id=ed1.id, patient_id=patients[patient1].id, gene_id=genes[gene1].id, value=float(gexp1[patient1][gene1]))
             db.session.add(ge1)
@@ -534,9 +554,20 @@ locus_array = []
 '''
 this might get the causal_flow structure
 
-SELECT CONCAT_WS('', CONCAT(l.locus_name, '_', l.mutation_type), g2.symbol) AS mutation,
-g.symbol AS regulator
-b.name AS bicluster
+SELECT CONCAT_WS(
+        '',
+        CONCAT(l.locus_name, '_', l.mutation_type),
+        CONCAT(g2.entrez, '_', sm.mutation_type)
+    ) AS mutation,
+    g.symbol AS regulator,
+    b.name AS bicluster,
+    CONCAT_WS(
+        '',
+        l.id,
+        g2.id
+    ) AS mutation_id,
+    tf.id AS regulator_id,
+    b.id AS bicluster_id
 FROM causal_flow cf
     JOIN bicluster b ON cf.bicluster_id=b.id
     JOIN tf_regulator tf ON cf.regulator_id=tf.id
@@ -748,6 +779,10 @@ def read_eigengenes(filename, prefix):
         old_patient = patient
         if patient[0].lower() == "x":
             patient = patient[1:]
+        
+        if patient_check.match(patient) == None:
+            continue
+
         for bicluster_number in eigengenes.index:
             bicluster_name = "{}_{}".format(prefix, bicluster_number)
             if bicluster_name in biclusters and patient in patients:
@@ -919,10 +954,11 @@ with open('data/postProcessed_clustersOfBiclusters_CNA_CNVkit.csv') as in_file:
     for tuple_val in bic_pat_values:
         split = tuple_val[1].split(" ")
         for patient in split:
-            db.session.add(BicPat( \
-                bicluster_id = biclusters[tuple_val[0]].id, \
-                patient_id = patients[patient].id \
-            ))
+            if patient_check.match(patient):
+                db.session.add(BicPat( \
+                    bicluster_id = biclusters[tuple_val[0]].id, \
+                    patient_id = patients[patient].id \
+                ))
 
     # create all the BicHals
     for tuple_val in bic_halmark_values:
@@ -1000,11 +1036,24 @@ interpret_causality_summary("./data/causality_CNA_final_8_13_2019/causalitySumma
 interpret_causality_summary("./data/causality_CNA_final_8_13_2019/causalitySummary_tfbs_db.csv", "tfbs_db")
 interpret_causality_summary("./data/causal_v9/summaryCausality_CNV_8_16_2019_0.3_0.05_cleanedUp.csv", None)
 
+with open("./data/oncoMerged_MESO/oncoMerge_mergedMuts.csv") as file:
+    header = file.readline().split(',')[1:]
+    for line in file:
+        somatic_mutation = line.split(',')[0]
+        booleans = line.split(',')[1:]
+        for index in range(0, len(booleans)):
+            patient = header[index].strip()
+            if somatic_mutation in somatic_mutations and patient in patients:
+                db.session.add(BuenoDeepFilter(
+                    somatic_mutation_id = somatic_mutations[somatic_mutation].id,
+                    patient_id = patients[patient].id,
+                    value = booleans[index].strip() == '1',
+                ))
+    db.session.commit()
+
 # handle eigengenes
 read_eigengenes("./data/eigengenes/biclusterEigengenes_pita.csv", "pita")
 read_eigengenes("./data/eigengenes/biclusterEigengenes_targetscan.csv", "targetscan")
 read_eigengenes("./data/eigengenes/biclusterEigengenes_tfbs_db.csv", "tfbs_db")
-
-("./data/causal_v9/summaryCausality_CNV_8_16_2019_0.3_0.05_cleanedUp.csv", "", somatic_mutations)
 
 print("program took {} seconds to complete".format(time.time() - start_time))

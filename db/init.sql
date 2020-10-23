@@ -259,4 +259,15 @@ CREATE TABLE eigengene (
     PRIMARY KEY (id),
     FOREIGN KEY (bicluster_id) REFERENCES bicluster (id),
     FOREIGN KEY (patient_id) REFERENCES patient (id)
-)
+);
+
+CREATE TABLE bueno_deep_filter (
+    id integer unsigned NOT NULL AUTO_INCREMENT,
+    somatic_mutation_id integer unsigned NOT NULL,
+    patient_id integer unsigned NOT NULL,
+    value boolean,
+
+    PRIMARY KEY (id),
+    FOREIGN KEY (patient_id) REFERENCES patient (id),
+    FOREIGN KEY (somatic_mutation_id) REFERENCES somatic_mutation (id)
+);

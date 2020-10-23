@@ -39,6 +39,7 @@ import itertools
 import gzip
 import pandas
 import numpy as np
+from sklearn.linear_model import LinearRegression
 # import rpy2.robjects as robjects
 from scipy.stats import hypergeom
 
@@ -342,6 +343,169 @@ def unhandled_exception(e):
 def index():
     return render_template('index.html')
 
+@app.route('/bicluster-causal-analysis/<mutation>/<regulator>/<bicluster>')
+# mutation and regulator are gene symbol names, bicluster is the bicluster name
+def bicluster_causal_analysis(mutation=None, regulator=None, bicluster=None):
+    db = dbconn()
+    c = db.cursor()
+
+    """
+    mutation gene expression
+    """
+
+    js_mutation_gene_expression_data = []
+    js_mutation_gene_expression_colors = ["#AAAAAA", "#FF0000"]
+    js_mutation_gene_expression_name = mutation + " Expression"
+
+    c.execute("""
+        SELECT ge.value, bd.value, pt.name FROM gene_expression ge
+            JOIN patient pt on ge.patient_id = pt.id
+            JOIN gene g ON ge.gene_id = g.id
+            JOIN tf_regulator tf ON tf.tf_id = g.id
+            JOIN causal_flow cf ON cf.regulator_id = tf.id AND cf.regulator_type = "tf"
+            JOIN bicluster b ON cf.bicluster_id = b.id
+            JOIN bueno_deep_filter bd ON bd.somatic_mutation_id = cf.somatic_mutation_id AND bd.patient_id = ge.patient_id
+            JOIN somatic_mutation sm ON cf.somatic_mutation_id = sm.id
+            LEFT JOIN gene g2 ON sm.ext_id = g2.id
+            LEFT JOIN locus l on sm.locus_id = l.id
+            WHERE (g2.symbol=%s OR l.locus_name=%s) AND g.symbol=%s AND b.name=%s;
+    """, [mutation, mutation, regulator, bicluster])
+    gene_expression_data = c.fetchall()
+    wt = [item[0] for item in gene_expression_data if item[1] == 1]
+    mutated = [item[0] for item in gene_expression_data if item[1] == 0]
+
+    # do statistics on WT
+    js_mutation_gene_expression_data.append({
+        "name": "WT",
+        "low": np.min(wt),
+        "q1":  np.percentile(wt, q=25.0),
+        "median": np.median(wt),
+        "q3": np.percentile(wt, q=75.0),
+        "high": np.max(wt),
+        "fillColor": js_mutation_gene_expression_colors[0],
+    })
+
+    # do statistics on mutated
+    js_mutation_gene_expression_data.append({
+        "name": "Mutated",
+        "low": np.min(mutated),
+        "q1":  np.percentile(mutated, q=25.0),
+        "median": np.median(mutated),
+        "q3": np.percentile(mutated, q=75.0),
+        "high": np.max(mutated),
+        "fillColor": js_mutation_gene_expression_colors[1],
+    })
+
+    """
+    eigengene expression
+    """
+
+    js_bicluster_eigengene_expression_data = []
+    js_bicluster_eigengene_expression_colors = ["#AAAAAA", "#FF0000"]
+    js_bicluster_eigengene_expression_name = bicluster + " Expression"
+
+    c.execute("""
+        SELECT e.value, bd.value, pt.name  FROM eigengene e
+            JOIN patient pt on e.patient_id = pt.id
+            JOIN bicluster b ON e.bicluster_id = b.id
+            JOIN causal_flow cf ON cf.bicluster_id = b.id
+            JOIN bueno_deep_filter bd ON bd.somatic_mutation_id = cf.somatic_mutation_id AND bd.patient_id = e.patient_id
+            JOIN tf_regulator tf ON cf.regulator_id = tf.id AND cf.regulator_type = "tf"
+            JOIN gene g ON g.id = tf.tf_id
+            JOIN somatic_mutation sm ON cf.somatic_mutation_id = sm.id
+            LEFT JOIN gene g2 ON sm.ext_id = g2.id
+            LEFT JOIN locus l on sm.locus_id = l.id
+            WHERE (g2.symbol=%s OR l.locus_name=%s) AND g.symbol=%s AND b.name=%s;
+    """, [mutation, mutation, regulator, bicluster])
+    eigengene_data = c.fetchall()
+    wt = [item[0] for item in eigengene_data if item[1] == 1]
+    mutated = [item[0] for item in eigengene_data if item[1] == 0]
+
+    # do statistics on WT
+    js_bicluster_eigengene_expression_data.append({
+        "name": "WT",
+        "low": np.min(wt),
+        "q1":  np.percentile(wt, q=25.0),
+        "median": np.median(wt),
+        "q3": np.percentile(wt, q=75.0),
+        "high": np.max(wt),
+        "fillColor": js_bicluster_eigengene_expression_colors[0],
+    })
+
+    # do statistics on mutated
+    js_bicluster_eigengene_expression_data.append({
+        "name": "Mutated",
+        "low": np.min(mutated),
+        "q1":  np.percentile(mutated, q=25.0),
+        "median": np.median(mutated),
+        "q3": np.percentile(mutated, q=75.0),
+        "high": np.max(mutated),
+        "fillColor": js_bicluster_eigengene_expression_colors[1],
+    })
+
+    """
+    residual aka "bicluster conditioned on mutation expression"
+    """
+
+    js_bicluster_residual_data = []
+    js_bicluster_residual_colors = ["#AAAAAA", "#FF0000"]
+    js_bicluster_residual_name = bicluster + " Expression Conditioned on " + mutation + " Expression"
+
+    # we already got the gene expression and eigengene expression data previously, so no sql fetches here
+    flattened_gene_expression = [(i[0],) for i in gene_expression_data]
+    flattened_eigengene = [(i[0]) for i in eigengene_data]
+    regression = LinearRegression().fit(flattened_gene_expression, flattened_eigengene)
+    residual = flattened_eigengene - regression.predict(flattened_gene_expression)
+
+    wt = []
+    for i in range(0, len(flattened_gene_expression)):
+        if eigengene_data[i][1] == 1:
+            wt.append(residual[i])
+    
+    mutated = []
+    for i in range(0, len(flattened_gene_expression)):
+        if eigengene_data[i][1] == 0:
+            mutated.append(residual[i])
+    
+    # do statistics on WT
+    js_bicluster_residual_data.append({
+        "name": "WT",
+        "low": np.min(wt),
+        "q1":  np.percentile(wt, q=25.0),
+        "median": np.median(wt),
+        "q3": np.percentile(wt, q=75.0),
+        "high": np.max(wt),
+        "fillColor": js_bicluster_residual_colors[0],
+    })
+
+    # do statistics on mutated
+    js_bicluster_residual_data.append({
+        "name": "Mutated",
+        "low": np.min(mutated),
+        "q1":  np.percentile(mutated, q=25.0),
+        "median": np.median(mutated),
+        "q3": np.percentile(mutated, q=75.0),
+        "high": np.max(mutated),
+        "fillColor": js_bicluster_residual_colors[1],
+    })
+
+    return json.dumps({
+        "mutation_gene_expression": {
+            "data": js_mutation_gene_expression_data,
+            "colors": js_mutation_gene_expression_colors,
+            "name": js_mutation_gene_expression_name,
+        },
+        "bicluster_eigengene_expression": {
+            "data": js_bicluster_eigengene_expression_data,
+            "colors": js_bicluster_eigengene_expression_colors,
+            "name": js_bicluster_eigengene_expression_name,
+        },
+        "residual": {
+            "data": js_bicluster_residual_data,
+            "colors": js_bicluster_residual_colors,
+            "name": js_bicluster_residual_name,
+        },
+    })
 
 @app.route('/bicluster/<bicluster>')
 def bicluster(bicluster=None):
@@ -450,7 +614,6 @@ FROM causal_flow WHERE bicluster_id=%s""", [bc_pk])
     tmp_cf = c.fetchall()
     causalFlows = []
 
-
     for cf_pk, cf_som_mut_id, cf_reg_id, cf_reg_type, cf_bc_id, cf_leo, cf_mlogp in tmp_cf:
         if cf_reg_type == 'tf':
             c.execute("""SELECT g.symbol FROM tf_regulator tr JOIN gene g ON tr.tf_id = g.id WHERE tr.id=%s""", [cf_reg_id])
@@ -469,12 +632,8 @@ FROM causal_flow WHERE bicluster_id=%s""", [bc_pk])
                 c.execute("""SELECT locus_name FROM locus WHERE id=%s """, [m1[3]]) # test: make sure this gets loci
                 mut = c.fetchone()[0]
 
-            ''' old code:
-            elif m1[2]=='pathway':
-                c.execute("""SELECT name FROM nci_nature_pathway WHERE id=%s""", [m1[1]]) # discrep. don't have this table
-                mut = c.fetchone()[0]
-            '''
-            causalFlows.append([mut, g1])
+            causalFlows.append([mut, g1])            
+
             elements.append({'data': { 'id': 'mut%d' % cf_som_mut_id, 'name': mut}, 'classes': 'genotype' }) # feature: differnet colors for genes vs loci
             elements.append({'data': { 'id': 'cf%d' % cf_pk, 'source': 'mut%d' % cf_som_mut_id, 'target': 'reg%d' % cf_reg_id } })
 

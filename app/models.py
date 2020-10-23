@@ -263,6 +263,17 @@ class SomaticMutation(db.Model):
 
     mutation_name = ""
 
+class BuenoDeepFilter(db.Model):
+    __tablename__ = 'bueno_deep_filter'
+
+    id = db.Column(db.Integer, primary_key=True)
+    somatic_mutation_id = db.Column(db.ForeignKey('somatic_mutation.id'), index=True)
+    patient_id = db.Column(db.ForeignKey('patient.id'), index=True)
+    value = db.Column(db.Boolean)
+
+    somatic_mutation = db.relationship('SomaticMutation', primaryjoin='BuenoDeepFilter.somatic_mutation_id == SomaticMutation.id', backref='bueno_deep_filters')
+    patient = db.relationship('Patient', primaryjoin='BuenoDeepFilter.patient_id == Patient.id', backref='bueno_deep_filters')
+
 # used
 class TfRegulator(db.Model):
     __tablename__ = 'tf_regulator'

@@ -55,35 +55,152 @@
 
     <!-- Javascript to modify tables -->
     <script type="text/javascript">
-        jQuery.extend( jQuery.fn.dataTableExt.oSort, {
-            "non-empty-string-asc": function (str1, str2) {
-                if(str1 == "")
-                    return 1;
-                if(str2 == "")
-                    return -1;
-                return ((str1 < str2) ? -1 : ((str1 > str2) ? 1 : 0));
-            },
-         
-            "non-empty-string-desc": function (str1, str2) {
-                if(str1 == "")
-                    return 1;
-                if(str2 == "")
-                    return -1;
-                return ((str1 < str2) ? 1 : ((str1 > str2) ? -1 : 0));
-            }
-        } );
+      function plotCausal(mutation, regulator, bicluster) {
+        document.getElementById("expressions-name").innerHTML = `${mutation}&nbsp;<span>-&gt;</span>&nbsp;${regulator}&nbsp;<span>-&gt;</span>&nbsp;${bicluster}`
         
-        $(document).ready(function() {
-            $('#gobps').DataTable( {
-                columnDefs: [
-                    {type: 'non-empty-string', targets: 2}
-                ],                
-                "order": [[2, "asc"]]
+        let request = new XMLHttpRequest()
+				request.open("GET", `/bicluster-causal-analysis/${mutation.trim()}/${regulator.trim()}/${bicluster.trim()}`, true)
+				request.responseType = "text"
+				
+				request.onload = (event) => {
+          try {
+            let data = JSON.parse(request.response)
+          
+            $('#gene-expression-boxplot').highcharts({
+              chart: {type: 'boxplot'},
+              legend: {enabled: true},
+              title: {text: ''},
+              xAxis: {
+                tickInterval: 1,
+                labels: {
+                  enabled: true,
+                  formatter: function() {
+                    return ["WT", "Mutated"][this.value]
+                  },
+                }
+            },
+              yAxis: {
+                title: {
+                  text: data.mutation_gene_expression.name,
+                },
+              },
+              series: [{
+                name: 'All',
+                showInLegend: false,
+                colorByPoint: true,
+                data: data.mutation_gene_expression.data,
+                colors: ["#000000"],
+                fillColors: data.mutation_gene_expression.colors,
+              }],
+              plotOptions: {
+                series: {
+                    pointWidth: 100
+                }
+              },
             });
-            var shiftWindow = function() { scrollBy(0, -50) };
-            window.addEventListener("hashchange", shiftWindow);
-            function load() { if (window.location.hash) shiftWindow(); }
 
+            $('#eigengene-boxplot').highcharts({
+              chart: {type: 'boxplot'},
+              legend: {enabled: true},
+              title: {text: ''},
+              xAxis: {
+                tickInterval: 1,
+                labels: {
+                  enabled: true,
+                  formatter: function() {
+                    return ["WT", "Mutated"][this.value]
+                  },
+                }
+            },
+              yAxis: {
+                title: {
+                  text: data.bicluster_eigengene_expression.name,
+                },
+              },
+              series: [{
+                name: 'All',
+                showInLegend: false,
+                colorByPoint: true,
+                data: data.bicluster_eigengene_expression.data,
+                colors: ["#000000"],
+                fillColors: data.bicluster_eigengene_expression.colors,
+              }],
+              plotOptions: {
+                series: {
+                    pointWidth: 100
+                }
+              },
+            });
+
+            $('#residual-boxplot').highcharts({
+              chart: {type: 'boxplot'},
+              legend: {enabled: true},
+              title: {text: ''},
+              xAxis: {
+                tickInterval: 1,
+                labels: {
+                  enabled: true,
+                  formatter: function() {
+                    return ["WT", "Mutated"][this.value]
+                  },
+                }
+            },
+              yAxis: {
+                title: {
+                  text: data.residual.name,
+                },
+              },
+              series: [{
+                name: 'All',
+                showInLegend: false,
+                colorByPoint: true,
+                data: data.residual.data,
+                colors: ["#000000"],
+                fillColors: data.residual.colors,
+              }],
+              plotOptions: {
+                series: {
+                    pointWidth: 100
+                }
+              },
+            });
+          }
+          catch {
+
+          }
+				}
+				
+				request.send()
+      }
+      
+      jQuery.extend( jQuery.fn.dataTableExt.oSort, {
+          "non-empty-string-asc": function (str1, str2) {
+              if(str1 == "")
+                  return 1;
+              if(str2 == "")
+                  return -1;
+              return ((str1 < str2) ? -1 : ((str1 > str2) ? 1 : 0));
+          },
+        
+          "non-empty-string-desc": function (str1, str2) {
+              if(str1 == "")
+                  return 1;
+              if(str2 == "")
+                  return -1;
+              return ((str1 < str2) ? 1 : ((str1 > str2) ? -1 : 0));
+          }
+      } );
+      
+      $(document).ready(function() {
+          $('#gobps').DataTable( {
+              columnDefs: [
+                  {type: 'non-empty-string', targets: 2}
+              ],                
+              "order": [[2, "asc"]]
+          });
+          var shiftWindow = function() { scrollBy(0, -50) };
+          window.addEventListener("hashchange", shiftWindow);
+          function load() { if (window.location.hash) shiftWindow(); }
 
       $('#boxplot-graph').highcharts({
         chart: {type: 'boxplot'},
@@ -374,12 +491,52 @@
         <h4>Causal Flows</h4>
         <div class="container-fluid" style="margin-top: 20px;"></div>
         <table class='table table-bordered table-striped text-center'>
+          <colgroup width="20%"></colgroup>
+          <colgroup width="5%"></colgroup>
+          <colgroup width="20%"></colgroup>
+          <colgroup width="5%"></colgroup>
+          <colgroup width="20%"></colgroup>
+          <colgroup width="30%"></colgroup>
           <tr>
-            <th class='text-center'><span style='font-weight: bold; color:#990000'>Mutation</span></th><th class='text-center'><span class='glyphicon glyphicon-arrow-right'></span></th><th class='text-center'><span style='font-weight: bold; color:#006600'>Regulator</span></th><th class='text-center'><span class='glyphicon glyphicon-arrow-right'></span></th><th class='text-center'><span style='font-weight: bold; color:#000099'>Bicluster</span></th>
+            <th class='text-center'>
+              <span style='font-weight: bold; color:#990000'>Mutation</span>
+            </th>
+            <th class='text-center'>
+              <span class='glyphicon glyphicon-arrow-right'></span>
+            </th>
+            <th class='text-center'>
+              <span style='font-weight: bold; color:#006600'>Regulator</span>
+            </th>
+            <th class='text-center'>
+              <span class='glyphicon glyphicon-arrow-right'></span>
+            </th>
+            <th class='text-center'>
+              <span style='font-weight: bold; color:#000099'>Bicluster</span>
+            </th>
+            <th class='text-center'>
+              <span style='font-weight: bold;'>Causal Flows</span>
+            </th>
           </tr>
           {% for cf1 in causalFlows %}
           <tr>
-            <td><span style='color:#990000'>{{ cf1[0] }}</span></td><td><span class='glyphicon glyphicon-arrow-right'></span></td><td><span style='color:#006600'>{{ cf1[1] }}</span></td><td><span class='glyphicon glyphicon-arrow-right'></span></td><td><span style='color:#000099'>{{ bicluster | upper }}</span></td>
+            <td valign="middle">
+              <span style='color:#990000'>{{ cf1[0] }}</span>
+            </td>
+            <td valign="middle">
+              <span class='glyphicon glyphicon-arrow-right'></span>
+            </td>
+            <td valign="middle">
+              <span style='color:#006600'>{{ cf1[1] }}</span>
+            </td>
+            <td valign="middle">
+              <span class='glyphicon glyphicon-arrow-right'></span>
+            </td>
+            <td valign="middle">
+              <span style='color:#000099'>{{ bicluster | upper }}</span>
+            </td>
+            <td valign="middle">
+              <button class="btn btn-primary btn-small expression-viewer" data-toggle="modal" data-target="#expressions-modal" mutation="{{cf1[0]}}" regulator="{{cf1[1]}}" bicluster="{{bicluster}}">View Causal Flow</button>  
+            </td>
           </tr>
           {% endfor %}
         </table>
@@ -442,4 +599,32 @@
   </div>
 </div>
 </div>
+
+<!-- Modal -->
+<div class="modal fade" id="expressions-modal" tabindex="-1" role="dialog" aria-labelledby="expressions-modal-label">
+  <div class="modal-dialog modal-lg" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+        <h4 class="modal-title" id="myModalLabel">Causal Flow&nbsp;<div id="expressions-name" style="display: inline;"></div></h4>
+      </div>
+      <div class="modal-body">
+        <div id="gene-expression-boxplot" style="width: 350px; height: 300px; display: inline-block;"></div>
+        <div id="eigengene-boxplot" style="width: 350px; height: 300px; display: inline-block;"></div>
+        <div id="residual-boxplot" style="width: 350px; height: 300px; display: inline-block;"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  let elements = document.getElementsByClassName("expression-viewer");
+  for(let i = 0; i < elements.length; i++) {
+    let element = elements[i]
+    element.addEventListener("click", (event) => {
+      plotCausal(element.attributes["mutation"].value, element.attributes["regulator"].value, element.attributes["bicluster"].value)
+    })
+  }
+</script>
+
 {% endblock %}
