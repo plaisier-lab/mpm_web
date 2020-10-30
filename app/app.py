@@ -42,6 +42,7 @@ import numpy as np
 from sklearn.linear_model import LinearRegression
 # import rpy2.robjects as robjects
 from scipy import stats
+from colour import Color
 
 
 NUM_PARTS = 5
@@ -114,13 +115,42 @@ ENRICHMENT_PHENOTYPES = [
     "Sarcomatoid", "Epithelioid", "Desmoplastic", "Biphasic",
 ]
 
+SEX_PHENOTYPES = ['M', 'F']
+
+PHENOTYPES_DICT = {
+    "sex": SEX_PHENOTYPES,
+    "histology_WHO": ENRICHMENT_PHENOTYPES,
+}
+
 GRAPH_COLOR_MAP = {
     'Sarcomatoid': '#2c6dd4',
     'Epithelioid': '#8a171a',
     'Desmoplastic': '#ed2024',
     'Biphasic': '#faa41a',
+    'M': '#6abd45',
+    'F': '#2c6dd4',
     'NA': 'grey',
 }
+
+GRAPH_COLOR_GRADIENTS = {
+    'age_at_surgery': ('#333333', '#2cd46d'),
+    'survival': ('#333333', '#2cd46d'),
+    'Monocytes': ('#333333', '#2cd46d'),
+    'Eosinophils': ('#333333', '#2cd46d'),
+    'Neutrophils': ('#333333', '#2cd46d'),
+    'Plasma.cells': ('#333333', '#2cd46d'),
+}
+
+SELECTABLE_PHENOTYPES = [
+    ("WHO Histology", "histology_WHO"),
+    ("Patient Sex", "sex"),
+    ("Age At Surgery", "age_at_surgery"),
+    ("Survival", "survival"),
+    ("Monocytes", "Monocytes"),
+    ("Eosinophils", "Eosinophils"),
+    ("Neutrophils", "Neutrophils"),
+    ("Plasma Cells", "Plasma.cells"),
+]
 
 
 # def phyper(q, m, n, k, lower_tail=False):
@@ -177,29 +207,6 @@ def cluster_data(cursor, cluster_id):
     excluded_patients = [row[0] for row in cursor.fetchall()]
     excluded_patients_string = "(%s)" % ','.join(map(lambda p: '\'%s\'' % p, excluded_patients))
 
-    '''
-    # lol part 1. also, i hate this sql statement. despite the obvious injection risk, this is fine. genes_string and included_patients_string is generated from an unexploitable source
-    cursor.execute("SELECT value FROM gene_expression ge " # at the end of this, we're getting values from the gene_expression table
-        + "JOIN gene g ON ge.gene_id=g.id " # we want to search based on gene entrez, so we JOIN the gene table with the gene expression table
-        + "JOIN patient p ON ge.patient_id=p.id " # we want to also search based on patient name, so we JOIN the patient table with the gene expression table
-        + "WHERE g.entrez IN " + genes_string + " " # we're looking for gene entrez ids that we found in the bic_gene table based on the input bicluster id
-        + "AND p.name IN " + included_patients_string + ";") # we're looking for patient names that we found in the patient table based on the given bicluster id
-    included_patients_result = [row[0] for row in cursor.fetchall()]
-    submat = np.ndarray((gene_count, len(included_patients)), dtype=float, buffer=np.array(included_patients_result), offset=0, strides=None, order=None) # we want a submatrix (whatever that is) of all the different gene expression values we found
-    in_data = submat_data(submat, included_patients) # throw the submatrix at this function, does statistics on the data
-
-    # lol part 2. also, i hate this sql statement. despite the obvious injection risk, this is fine. genes_string and excluded_patients_string is generated from an unexploitable source
-    cursor.execute("SELECT value FROM gene_expression ge " # at the end of this, we're getting values from the gene_expression table
-        + "JOIN gene g ON ge.gene_id=g.id " # we want to search based on gene entrez, so we JOIN the gene table with the gene expression table
-        + "JOIN patient p ON ge.patient_id=p.id " # we want to also search based on patient name, so we JOIN the patient table with the gene expression table
-        + "WHERE g.entrez IN " + genes_string + " " # we're looking for gene entrez ids that we found in the bic_gene table based on the input bicluster id
-        + "AND p.name IN " + excluded_patients_string + ";") # we're looking for patient names that we DIDN'T find in the patient table based on the given bicluster id
-    excluded_patients_result = [row[0] for row in cursor.fetchall()]
-    ex_submat = np.ndarray((gene_count, len(excluded_patients)), dtype=float, buffer=np.array(excluded_patients_result), offset=0, strides=None, order=None) # we want a submatrix (whatever that is) of all the different gene expression values we found
-
-    out_data = submat_data(ex_submat, excluded_patients)
-    '''
-
     all_patients_string = "(%s)" % ",".join(map(lambda p: '\'%s\'' % p, included_patients + excluded_patients))
     cursor.execute("SELECT value FROM gene_expression ge " # at the end of this, we're getting values from the gene_expression table
         + "JOIN gene g ON ge.gene_id=g.id " # we want to search based on gene entrez, so we JOIN the gene table with the gene expression table
@@ -213,7 +220,7 @@ def cluster_data(cursor, cluster_id):
     return data
 
 
-def subtype_enrichment(cursor, cluster_id):
+def subtype_enrichment(cursor, cluster_id, phenotype_name):
     cursor.execute("""SELECT g.entrez from bic_gene bg
         JOIN gene g ON bg.gene_id=g.id WHERE bicluster_id=%s""", [cluster_id])
     genes = [row[0] for row in cursor.fetchall()]
@@ -230,7 +237,8 @@ def subtype_enrichment(cursor, cluster_id):
     # get excluded patients based on the given bicluster id
     cursor.execute("""SELECT name FROM patient WHERE id NOT IN
         (SELECT patient_id FROM bic_pat WHERE bicluster_id=%s)""",
-        [cluster_id])
+        [cluster_id]
+    )
     excluded_patients = [row[0] for row in cursor.fetchall()]
     excluded_patients_string = "(%s)" % ','.join(map(lambda p: '\'%s\'' % p, excluded_patients))
 
@@ -241,8 +249,10 @@ def subtype_enrichment(cursor, cluster_id):
     cursor.execute("""SELECT p.name, pd.phenotype_string FROM pheno_data pd
         JOIN patient p ON pd.patient_id=p.id
         JOIN phenotype pt ON pd.phenotype_id=pt.id
-        WHERE pt.name="histology_WHO" 
-            AND pd.phenotype_string <> 'NA'""")
+        WHERE pt.name=%s 
+            AND pd.phenotype_string <> 'NA'""",
+        [phenotype_name]
+    )
     # histology_WHO phenotype lookup ^^^
 
     ptmap = {patient: phenotype for patient, phenotype in cursor.fetchall()} # don't change
@@ -329,6 +339,32 @@ def subtype_enrichment(cursor, cluster_id):
 
     return pvalues, min_pvalue, max_pvalue
 
+def get_phenotype_min_max(cursor, phenotype_name):
+    cursor.execute("""
+        SELECT phenotype_value FROM pheno_data pd
+            JOIN patient p ON pd.patient_id=p.id
+            JOIN phenotype pt ON pd.phenotype_id=pt.id
+            WHERE pt.name=%s;
+    """, [phenotype_name])
+    data = cursor.fetchall()
+    phenotype_data = [item[0] for item in data]
+
+    if phenotype_data[0] == None:
+        return None
+    else:
+        return (np.min(phenotype_data), np.max(phenotype_data))
+
+def get_phenotype_color(phenotype_name, value, min_max):
+    min, max = min_max
+    color1 = Color(GRAPH_COLOR_GRADIENTS[phenotype_name][0])
+    color2 = Color(GRAPH_COLOR_GRADIENTS[phenotype_name][1])
+    percent = (value - min) / (max - min)
+    hex = Color(rgb=(color1.red * (1 - percent) + color2.red * percent, color1.green * (1 - percent) + color2.green * percent, color1.blue * (1 - percent) + color2.blue * percent)).hex
+
+    if len(hex) == 4:
+        return hex + hex[1] + hex[1] + hex[1]
+    else:
+        return hex
 
 ######################################################################
 # Available application paths
@@ -343,9 +379,9 @@ def unhandled_exception(e):
 def index():
     return render_template('index.html')
 
-@app.route('/bicluster-causal-analysis/<mutation>/<regulator>/<bicluster>')
+@app.route('/bicluster-causal-analysis/<mutation>/<regulator>/<bicluster>/<phenotype_name>')
 # mutation and regulator are gene symbol names, bicluster is the bicluster name
-def bicluster_causal_analysis(mutation=None, regulator=None, bicluster=None):
+def bicluster_causal_analysis(mutation=None, regulator=None, bicluster=None, phenotype_name="histology_WHO"):
     db = dbconn()
     c = db.cursor()
 
@@ -516,7 +552,7 @@ def bicluster_causal_analysis(mutation=None, regulator=None, bicluster=None):
         eigengene_data_by_patient[datum[2]] = (datum[0], datum[1])
     
     js_scatterplot_data = {}
-    for phenotype in ENRICHMENT_PHENOTYPES:
+    for phenotype in PHENOTYPES_DICT[phenotype_name]:
         js_scatterplot_data[phenotype] = {}
         
         js_scatterplot_data[phenotype][0] = {
@@ -548,9 +584,9 @@ def bicluster_causal_analysis(mutation=None, regulator=None, bicluster=None):
         SELECT p.name, pd.phenotype_string FROM pheno_data pd
             JOIN patient p ON pd.patient_id=p.id
             JOIN phenotype pt ON pd.phenotype_id=pt.id
-            WHERE pt.name="histology_WHO" 
+            WHERE pt.name=%s 
             AND pd.phenotype_string <> 'NA';
-    """)
+    """, [phenotype_name])
     phenotype_data = c.fetchall()
 
     phenotype_by_patient = {}
@@ -611,8 +647,112 @@ def bicluster_causal_analysis(mutation=None, regulator=None, bicluster=None):
         },
     })
 
+    db.close()
+
+
+@app.route('/bicluster-expression-graph/<bicluster>/<phenotype_name>')
+def bicluster_expression_graph(bicluster=None, phenotype_name="histology_WHO"):
+    db = dbconn()
+    c = db.cursor()
+    c.execute("SELECT id FROM bicluster WHERE name=%s;", [bicluster])
+    bc_pk = c.fetchone()[0]
+
+    phenotype_min_max = get_phenotype_min_max(c, phenotype_name)
+
+    # Prepare graph plotting data
+    all_boxplot_data = cluster_data(c, bc_pk)
+    enrichment_pvalues, min_enrichment_pvalue, max_enrichment_pvalue = subtype_enrichment(c, bc_pk, phenotype_name)
+    js_enrichment_data = []
+    js_enrichment_colors = []
+
+    if phenotype_min_max == None:
+        for part in enrichment_pvalues:
+            for phenotype in PHENOTYPES_DICT[phenotype_name]:
+                js_enrichment_data.append([phenotype, part[phenotype]])
+                js_enrichment_colors.append(GRAPH_COLOR_MAP[phenotype]) # TODO: make the color information dynamically load in
+
+    enrichment_upper = -math.log10(0.05/30.0)
+    enrichment_lower = math.log10(0.05/30.0)
+    enrich_perc20 = len(js_enrichment_data) / 5
+    enrich_quintiles = [enrich_perc20 * i - 0.5 for i in range(1, 6)]
+
+    ratios_mean = 8.167528228975065 # TODO: have some way to precompute the mean for all the 4.5 million gene_expression cells
+    patients = [item[0] for item in all_boxplot_data]
+
+    c.execute("SELECT p.name, pd.phenotype_string, pd.phenotype_value FROM patient p"
+        + " JOIN pheno_data pd ON pd.patient_id=p.id"
+        + " JOIN phenotype pt ON pd.phenotype_id=pt.id"
+        + " WHERE p.name IN (" + (','.join(map(lambda p: '\'%s\'' % p, patients))) + ") AND pt.name=%s;",
+        [phenotype_name]
+    )
+    values = c.fetchall()
+    string_ptmap = {patient: phenotype for patient, phenotype, _ in values}
+    value_ptmap = {patient: value for patient, _, value in values}
+
+    js_boxplot_colors = []
+    js_boxplot_legend = []
+    if phenotype_min_max == None:
+        phenotypes = [string_ptmap[patient] for patient in patients]
+        for phenotype in PHENOTYPES_DICT[phenotype_name]:
+            js_boxplot_legend.append({
+                "name": phenotype,
+                "color": GRAPH_COLOR_MAP[phenotype],
+            })
+    else:
+        js_boxplot_legend.append({
+            "name": "Lowest Value",
+            "color": GRAPH_COLOR_GRADIENTS[phenotype_name][0],
+        })
+
+        js_boxplot_legend.append({
+            "name": "Highest Value",
+            "color": GRAPH_COLOR_GRADIENTS[phenotype_name][1],
+        })
+    
+    js_boxplot_data = []
+    for i, item in enumerate(all_boxplot_data):
+        color = None
+        if phenotype_min_max == None:
+            color = GRAPH_COLOR_MAP[string_ptmap[patients[i]]]
+        else:
+            color = get_phenotype_color(phenotype_name, value_ptmap[patients[i]], phenotype_min_max)
+
+        js_boxplot_colors.append(color)
+        js_boxplot_data.append({
+            "name": patients[i],
+            "low": item[1],
+            "q1":  item[2],
+            "median": item[3],
+            "q3": item[4],
+            "high": item[5],
+            "fillColor": "%sB3" % color, # get the color and append a transparency value
+        })
+    
+    # perc20 = len(in_data) / 5
+    perc20 = len(all_boxplot_data) / 5
+    quintiles = [perc20 * i for i in range(1, 6)]
+
+    db.close()
+
+    return json.dumps({
+        "boxplotData": js_boxplot_data,
+        "boxplotLegend": js_boxplot_legend,
+        "boxplotColors": js_boxplot_colors,
+        "boxplotRatiosMean": ratios_mean,
+        "boxplotQuintiles": quintiles,
+        "enrichmentQuintiles": enrich_quintiles,
+        "maxEnrichmentPValue": max_enrichment_pvalue,
+        "minEnrichmentPValue": min_enrichment_pvalue,
+        "enrichmentUpper": enrichment_upper,
+        "enrichmentLower": enrichment_lower,
+        "enrichmentData": js_enrichment_data,
+        "enrichmentColors": js_enrichment_colors,
+    })
+
 @app.route('/bicluster/<bicluster>')
 def bicluster(bicluster=None):
+    selectable_phenotypes = SELECTABLE_PHENOTYPES
+    
     db = dbconn()
     c = db.cursor()
     c.execute("""SELECT id,name,var_exp_fpc,var_exp_fpc_p_value,survival,survival_p_value
@@ -799,49 +939,6 @@ WHERE bic_go.bicluster_id=%s""", [bc_pk])
         c.execute("""SELECT distinct gene.symbol FROM go_gene, gene, bic_gene WHERE go_gene.go_bp_id=%s AND bic_gene.bicluster_id=%s AND go_gene.gene_id=gene.id AND gene.id=bic_gene.gene_id order by gene.symbol""", [gobp[0], bc_pk])
         gobps.append(list(gobp) + [[row[0] for row in c.fetchall()]])
 
-    # Prepare graph plotting data
-    # exp_data = read_exps()
-    # in_data, out_data = cluster_data(c, bc_pk)
-    all_boxplot_data = cluster_data(c, bc_pk)
-    enrichment_pvalues, min_enrichment_pvalue, max_enrichment_pvalue = subtype_enrichment(c, bc_pk)
-    js_enrichment_data = []
-    js_enrichment_colors = []
-    for part in enrichment_pvalues:
-        for phenotype in ENRICHMENT_PHENOTYPES:
-            js_enrichment_data.append([phenotype, part[phenotype]])
-            js_enrichment_colors.append(GRAPH_COLOR_MAP[phenotype]) # TODO: make the color information dynamically load in
-    enrichment_upper = -math.log10(0.05/30.0)
-    enrichment_lower = math.log10(0.05/30.0)
-    enrich_perc20 = len(js_enrichment_data) / 5
-    enrich_quintiles = [enrich_perc20 * i - 0.5 for i in range(1, 6)]
-
-    ratios_mean = 8.167528228975065 # TODO: have some way to precompute the mean for all the 4.5 million gene_expression cells
-    # all_boxplot_data = in_data + out_data
-    patients = [item[0] for item in all_boxplot_data]
-
-    c.execute("""SELECT p.name, pd.phenotype_string FROM patient p
-        JOIN pheno_data pd ON pd.patient_id=p.id
-        JOIN phenotype pt ON pd.phenotype_id=pt.id
-        WHERE p.name IN (%s) AND pt.name='histology_WHO'""" %
-              ','.join(map(lambda p: '\'%s\'' % p, patients)))
-    ptmap = {patient: phenotype for patient, phenotype in c.fetchall()}
-    phenotypes = [ptmap[patient] for patient in patients]
-    boxplot_colors = [GRAPH_COLOR_MAP[pt] for pt in phenotypes]
-    # js_boxplot_data = [[patients[i]] + item[1:] for i, item in enumerate(all_boxplot_data)]
-
-    js_boxplot_data = [{
-        "name": patients[i],
-        "low": item[1],
-        "q1":  item[2],
-        "median": item[3],
-        "q3": item[4],
-        "high": item[5],
-        "fillColor": "%sB3" % GRAPH_COLOR_MAP[ptmap[patients[i]]], # get the color and append a transparency value
-    } for i, item in enumerate(all_boxplot_data)]
-    
-    # perc20 = len(in_data) / 5
-    perc20 = len(all_boxplot_data) / 5
-    quintiles = [perc20 * i for i in range(1, 6)]
     db.close()
 
     return render_template('bicluster.html', **locals())

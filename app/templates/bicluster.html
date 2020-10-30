@@ -72,9 +72,10 @@
       
       function plotCausal(mutation, regulator, bicluster) {
         document.getElementById("expressions-name").innerHTML = `${mutation}&nbsp;<span>🡒</span>&nbsp;${regulator}&nbsp;<span>🡒</span>&nbsp;${bicluster}`
+        let phenotype = document.getElementById("causal-phenotype-select").value
         
         let request = new XMLHttpRequest()
-				request.open("GET", `/bicluster-causal-analysis/${mutation.trim()}/${regulator.trim()}/${bicluster.trim()}`, true)
+				request.open("GET", `/bicluster-causal-analysis/${mutation.trim()}/${regulator.trim()}/${bicluster.trim()}/${phenotype}`, true)
 				request.responseType = "text"
 				
 				request.onload = (event) => {
@@ -276,154 +277,214 @@
               return ((str1 < str2) ? 1 : ((str1 > str2) ? -1 : 0));
           }
       } );
+
+      function plotExpressions(phenotype) {
+        let request = new XMLHttpRequest()
+				request.open("GET", `/bicluster-expression-graph/{{bicluster}}/${phenotype}`, true)
+				request.responseType = "text"
+				
+				request.onload = (event) => {
+          try {
+            let json = JSON.parse(request.response)
+          
+            $('#boxplot-graph').highcharts({
+              chart: {
+                type: 'boxplot'
+              },
+              legend: {
+                enabled: true
+              },
+              title: {
+                text: ''
+              },
+              xAxis: {
+                plotLines: [
+                  {
+                    value: json.boxplotQuintiles[0],
+                    color: 'lightGray', dashStyle: 'shortdash',
+                    width: 1, zIndex: 3,
+                    label: {
+                      text: '20%', 
+                      style: {
+                        color: 'lightGray',
+                        fontSize: '8pt'
+                      }
+                    }
+                  }, {
+                    value: json.boxplotQuintiles[1],
+                    color: 'lightGray', dashStyle: 'shortdash',
+                    width: 1, zIndex: 3,
+                    label: {
+                      text: '40%',
+                      style: {
+                        color: 'lightGray',
+                        fontSize: '8pt'
+                      }
+                    }
+                  }, {
+                    value: json.boxplotQuintiles[2],
+                    color: 'lightGray', dashStyle: 'shortdash',
+                    width: 1, zIndex: 3,
+                    label: {
+                      text: '60%',
+                      style: {
+                        color: 'lightGray',
+                        fontSize: '8pt'
+                      }
+                    }
+                  }, {
+                    value: json.boxplotQuintiles[3],
+                    color: 'lightGray', dashStyle: 'shortdash',
+                    width: 1, zIndex: 3,
+                    label: {
+                      text: '80%',
+                      style: {
+                        color: 'lightGray',
+                        fontSize: '8pt'
+                      }
+                    }
+                  }
+                ]
+              },
+              yAxis: {
+                title: {text: 'Relative Expression'},
+                plotLines: [{
+                  value: json.boxplotRatiosMean,
+                  color: 'green',
+                  dashStyle: 'shortdash',
+                  width: 1,
+                  zIndex: 3,
+                  label: {
+                    text: 'mean',
+                    style: {
+                      color: 'gray',
+                      fontSize: '8pt'
+                    }
+                  }
+                }]
+              },
+              series: [
+                {
+                  name: 'All',
+                  showInLegend: false,
+                  colorByPoint: true,
+                  data: json.boxplotData,
+                  colors: json.boxplotColors,
+                  fillColors: json.boxplotColors,
+                },
+                ...json.boxplotLegend
+              ]
+            });
+
+            $('#enrichment-graph').highcharts({
+              chart: {
+                type: 'column',
+                alignTicks: false
+              },
+              title: {
+                text: ''
+              },
+              xAxis: {
+                tickLength: 0,
+                labels: {
+                  enabled: false,
+                },
+                plotLines: [
+                  {
+                    value: json.enrichmentQuintiles[0],
+                    color: 'lightGray', dashStyle: 'shortdash',
+                    width: 1, zIndex: 3,
+                    label: {
+                      text: '20%',
+                      style: {
+                        color: 'lightGray',
+                        fontSize: '8pt'
+                      }
+                    }
+                  }, {
+                    value: json.enrichmentQuintiles[1],
+                    color: 'lightGray', dashStyle: 'shortdash',
+                    width: 1, zIndex: 3,
+                    label: {
+                      text: '40%',
+                      style: {
+                        color: 'lightGray',
+                        fontSize: '8pt'
+                      }
+                    }
+                  }, {
+                    value: json.enrichmentQuintiles[2],
+                    color: 'lightGray', dashStyle: 'shortdash',
+                    width: 1, zIndex: 3,
+                    label: {
+                      text: '60%', 
+                      style: {
+                        color: 'lightGray',
+                        fontSize: '8pt'
+                      }
+                    }
+                  }, {
+                    value: json.enrichmentQuintiles[3],
+                    color: 'lightGray', dashStyle: 'shortdash',
+                    width: 1, zIndex: 3,
+                    label: {
+                      text: '80%',
+                      style: {
+                        color: 'lightGray',
+                        fontSize: '8pt'
+                      }
+                    }
+                  }
+                ]
+              },
+              yAxis: {
+                title: {
+                  text: 'Enrichment of Subtypes in Quintiles'
+                },
+                max: json.maxEnrichmentPValue,
+                min: json.minEnrichmentPValue,
+                plotLines: [{
+                  value: json.enrichmentUpper,
+                  color: 'red',
+                  dashStyle: 'shortdash',
+                  width: 1,
+                  zIndex: 3,
+                }, {
+                  value: json.enrichmentLower,
+                  color: 'red',
+                  dashStyle: 'shortdash',
+                  width: 1,
+                  zIndex: 3,
+                }]
+              },
+              series: [{
+                name: 'All',
+                data: json.enrichmentData,
+                showInLegend: false,
+                colorByPoint: true,
+                colors: json.enrichmentColors,
+              }]
+            });
+          }
+          catch {
+
+          }
+        }
+
+        request.send()
+      }
       
       $(document).ready(function() {
-          $('#gobps').DataTable( {
-              columnDefs: [
-                  {type: 'non-empty-string', targets: 2}
-              ],                
-              "order": [[2, "asc"]]
-          });
-          var shiftWindow = function() { scrollBy(0, -50) };
-          window.addEventListener("hashchange", shiftWindow);
-          function load() { if (window.location.hash) shiftWindow(); }
-
-      $('#boxplot-graph').highcharts({
-        chart: {type: 'boxplot'},
-        legend: {enabled: true},
-        title: {text: ''},
-        xAxis: {
-          plotLines: [{
-            value: {{in_data|length}}, color: 'red', dashStyle: 'shortdash',
-            width: 1, zIndex: 3,
-            label: {
-              text: 'columns in/out ({{all_boxplot_data|length}})',
-              style: { color: 'gray', fontSize: '8pt' }
-            }
-          },
-          {
-            value: {{quintiles[0]}},
-            color: 'lightGray', dashStyle: 'shortdash',
-            width: 1, zIndex: 3,
-            label: {
-              text: '20%', style: { color: 'lightGray', fontSize: '8pt' }
-            }
-          },
-          {
-            value: {{quintiles[1]}},
-            color: 'lightGray', dashStyle: 'shortdash',
-            width: 1, zIndex: 3,
-            label: {
-              text: '40%', style: { color: 'lightGray', fontSize: '8pt' }
-            }
-          },
-          {
-            value: {{quintiles[2]}},
-            color: 'lightGray', dashStyle: 'shortdash',
-            width: 1, zIndex: 3,
-            label: {
-              text: '60%', style: { color: 'lightGray', fontSize: '8pt' }
-            }
-          },
-          {
-            value: {{quintiles[3]}},
-            color: 'lightGray', dashStyle: 'shortdash',
-            width: 1, zIndex: 3,
-            label: {
-              text: '80%', style: { color: 'lightGray', fontSize: '8pt' }
-            }
-          }
-          ]
-        },
-        yAxis: {
-          title: {text: 'Relative Expression'},
-          plotLines: [{
-            value: {{ratios_mean}},
-            color: 'green', dashStyle: 'shortdash', width: 1, zIndex: 3,
-            label: {
-              text: 'mean',
-              style: { color: 'gray', fontSize: '8pt' }
-            }
-          }]
-        },
-        series: [{
-          name: 'All',
-          showInLegend: false,
-          colorByPoint: true,
-          data: {{js_boxplot_data|safe}},
-          colors: {{boxplot_colors|safe}},
-          fillColors: {{boxplot_colors|safe}},
-          },
-          { name: 'Sarcomatoid', color: '#2c6dd4'},
-          { name: 'Epithelioid', color: '#8a171a'},
-          { name: 'Desmoplastic', color: '#ed2024'},
-          { name: 'Biphasic', color: '#faa41a'},
-          { name: 'NA', color: 'grey'},
-          ]
-      });
-      $('#enrichment-graph').highcharts({
-          chart: {type: 'column', alignTicks: false}, 
-          title: {text: ''},
-          xAxis: {
-            tickLength: 0,
-            labels: {
-              enabled: false,
-            },
-            plotLines: [
-              {
-                value: {{enrich_quintiles[0]}},
-                color: 'lightGray', dashStyle: 'shortdash',
-                width: 1, zIndex: 3,
-                label: {
-                  text: '20%', style: { color: 'lightGray', fontSize: '8pt' }
-                }
-              },
-              {
-                value: {{enrich_quintiles[1]}},
-                color: 'lightGray', dashStyle: 'shortdash',
-                width: 1, zIndex: 3,
-                label: {
-                  text: '40%', style: { color: 'lightGray', fontSize: '8pt' }
-                }
-              },
-              {
-                value: {{enrich_quintiles[2]}},
-                color: 'lightGray', dashStyle: 'shortdash',
-                width: 1, zIndex: 3,
-                label: {
-                  text: '60%', style: { color: 'lightGray', fontSize: '8pt' }
-                }
-              },
-              {
-                value: {{enrich_quintiles[3]}},
-                color: 'lightGray', dashStyle: 'shortdash',
-                width: 1, zIndex: 3,
-                label: {
-                  text: '80%', style: { color: 'lightGray', fontSize: '8pt' }
-                }
-              }
-            ]},
-          yAxis: {
-            title: {text: 'Enrichment of Subtypes in Quintiles'},
-            max: {{max_enrichment_pvalue}},
-            min: {{min_enrichment_pvalue}},
-
-            plotLines: [{
-              value: {{enrichment_upper}},
-              color: 'red', dashStyle: 'shortdash', width: 1, zIndex: 3,
-            },
-            {
-              value: {{enrichment_lower}},
-              color: 'red', dashStyle: 'shortdash', width: 1, zIndex: 3,
-            }]
-          },
-          series: [
-            { name: 'All', data: {{js_enrichment_data|safe}},
-              showInLegend: false, colorByPoint: true,
-              colors: {{js_enrichment_colors|safe}}
-          }]
+        $('#gobps').DataTable( {
+            columnDefs: [
+                {type: 'non-empty-string', targets: 2}
+            ],                
+            "order": [[2, "asc"]]
         });
-        
+        var shiftWindow = function() { scrollBy(0, -50) };
+        window.addEventListener("hashchange", shiftWindow);
+        function load() { if (window.location.hash) shiftWindow(); }
+
         var graphElements = {{elements|safe}};
 
         var cy = cytoscape({
@@ -443,7 +504,7 @@
               selector: '.activator',
               style: { 'width': 3, 'line-color': '#0f0', 'opacity': 0.3, 'target-arrow-color': '#0f0', 'target-arrow-shape': 'triangle' }
             },
- 
+
             {
               selector: '.genotype',
               style: { 'background-color': '#d0d', 'label': 'data(name)', 'shape': 'polygon', 'shape-polygon-points': '-1 -1 0 -0.45 1 -1 0 1' }
@@ -466,9 +527,8 @@
             }
           ], layout: { name: 'dagre'}
         });
-          cy.resize();
-
-        });
+        cy.resize();
+      });
     </script>
 {% endblock %}
 {% block content %}
@@ -484,17 +544,40 @@
       </div>
       <div class='bs-callout bs-callout-default'>
         <h4>Summary</h4>
-        <div align='center'>
-        <table width='100%'>
+        <div>
+          <br />
+          <div class="form-group" style="width: 200px;">
+            <label for="phenotype-select">Phenotype</label>
+            <select id="phenotype-select" class="form-control">
+              {% for phenotype in selectable_phenotypes %}
+                <option value="{{ phenotype[1] }}">{{ phenotype[0] }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <table width='100%'>
             <tr>
-                    <td width='60%' align='center'><span data-toggle='collapse' data-target='#tumorExp'><b>Bicluster Expression of Patient Tumors</b></span> <span class="glyphicon glyphicon-info-sign" data-toggle='collapse' data-target='#tumorExp' style='color:#f00;)'></span>
-                    <div id='tumorExp' class='collapse' style='text-align:justify;'>Expression of genes from patient tumors in bicluster on left side of red dashed line and out of bicluster on right of red dashed line. Each patient tumor is represented as a boxplot, ordered by their median expression for the bicluster genes (smallest to largest) and colored according to it's GBM subtype.</div></td>
-                <td width='40%' align='center'><span data-toggle='collapse' data-target='#enrich'><b>Enrichment of Tumor Subtypes in Qunitiles</b></span> <span class="glyphicon glyphicon-info-sign" data-toggle='collapse' data-target='#enrich' style='color:#f00;)'></span>
-                    <div id='enrich' class='collapse' style='text-align:justify;'>Patient tumors are sorted as on the left and broken into quintiles following the dashed grey lines. Then each quintile is tested for enrichment of each tumor subtype. The deviation from zero indicate -log10(enrichment p-value), and positive values indicate over-enrichment and negative values underenrichment.</div></td>
-                </tr>
-            </table>
-            <div id="boxplot-graph"></div>
-            <div id="enrichment-graph"></div>
+              <td width='60%' align='center'>
+                <span data-toggle='collapse' data-target='#tumorExp'>
+                  <b>Bicluster Expression of Patient Tumors</b>
+                </span>
+                <span class="glyphicon glyphicon-info-sign" data-toggle='collapse' data-target='#tumorExp' style='color:#f00;'></span>
+                <div id='tumorExp' class='collapse' style='text-align:justify;'>
+                  Expression of genes from patient tumors in bicluster on left side of red dashed line and out of bicluster on right of red dashed line. Each patient tumor is represented as a boxplot, ordered by their median expression for the bicluster genes (smallest to largest) and colored according to it's GBM subtype.
+                </div>
+              </td>
+              <td width='40%' align='center'>
+                <span data-toggle='collapse' data-target='#enrich'>
+                  <b>Enrichment of Tumor Subtypes in Qunitiles</b>
+                </span>
+                <span class="glyphicon glyphicon-info-sign" data-toggle='collapse' data-target='#enrich' style='color:#f00;)'></span>
+                <div id='enrich' class='collapse' style='text-align:justify;'>
+                  Patient tumors are sorted as on the left and broken into quintiles following the dashed grey lines. Then each quintile is tested for enrichment of each tumor subtype. The deviation from zero indicate -log10(enrichment p-value), and positive values indicate over-enrichment and negative values underenrichment.
+                </div>
+              </td>
+            </tr>
+          </table>
+          <div id="boxplot-graph"></div>
+          <div id="enrichment-graph"></div>
         </div>
         <table class='table table-bordered table-striped text-center'>
           <tr>
@@ -694,22 +777,35 @@
         <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
         <h4 class="modal-title" id="myModalLabel">Causal Flow&nbsp;<div id="expressions-name" style="display: inline;"></div></h4>
       </div>
-      <div class="modal-body causal-flow-charts">
-        <div>
-          <div id="gene-expression-stats"></div>
-          <div id="gene-expression-boxplot" style="width: 350px; height: 300px; display: inline-block;"></div>
-        </div>
-        <div>
-          <div id="eigengene-stats"></div>
-          <div id="eigengene-boxplot" style="width: 350px; height: 300px; display: inline-block;"></div>
-        </div>
-        <div>
-          <div id="scatterplot-stats"></div>
-          <div id="scatterplot" style="width: 350px; height: 435px; display: inline-block;"></div>
-        </div>
-        <div>
-          <div id="residual-stats"></div>
-          <div id="residual-boxplot" style="width: 350px; height: 300px; display: inline-block;"></div>
+      <div class="modal-body">
+        <center>
+          <div class="form-group" style="width: 200px;">
+            <label for="causal-phenotype-select">Phenotype</label>
+            <select id="causal-phenotype-select" class="form-control">
+              {% for phenotype in selectable_phenotypes %}
+                <option value="{{ phenotype[1] }}">{{ phenotype[0] }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </center>
+        
+        <div class="causal-flow-charts">
+          <div>
+            <div id="gene-expression-stats"></div>
+            <div id="gene-expression-boxplot" style="width: 350px; height: 300px; display: inline-block;"></div>
+          </div>
+          <div>
+            <div id="eigengene-stats"></div>
+            <div id="eigengene-boxplot" style="width: 350px; height: 300px; display: inline-block;"></div>
+          </div>
+          <div>
+            <div id="scatterplot-stats"></div>
+            <div id="scatterplot" style="width: 350px; height: 435px; display: inline-block;"></div>
+          </div>
+          <div>
+            <div id="residual-stats"></div>
+            <div id="residual-boxplot" style="width: 350px; height: 300px; display: inline-block;"></div>
+          </div>
         </div>
       </div>
     </div>
@@ -718,12 +814,29 @@
 
 <script>
   let elements = document.getElementsByClassName("expression-viewer");
+
+  let causalMutation, causalRegulator, causalBicluster
+
   for(let i = 0; i < elements.length; i++) {
     let element = elements[i]
     element.addEventListener("click", (event) => {
-      plotCausal(element.attributes["mutation"].value, element.attributes["regulator"].value, element.attributes["bicluster"].value)
+      causalMutation = element.attributes["mutation"].value
+      causalRegulator = element.attributes["regulator"].value
+      causalBicluster = element.attributes["bicluster"].value
+      plotCausal(causalMutation, causalRegulator, causalBicluster)
     })
   }
+
+  document.getElementById("causal-phenotype-select").addEventListener("change", (event) => {
+    plotCausal(causalMutation, causalRegulator, causalBicluster)
+  })
+
+  document.getElementById("phenotype-select").addEventListener("change", (event) => {
+    let value = event.target.value
+    plotExpressions(value)
+  })
+
+  plotExpressions("histology_WHO")
 </script>
 
 {% endblock %}
