@@ -5,6 +5,7 @@
     <script type="text/javascript" src="https://cdn.datatables.net/t/dt/jq-2.2.0,dt-1.10.11/datatables.min.js"></script>
     <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/t/dt/jq-2.2.0,dt-1.10.11/datatables.min.css"/>
     <script src="https://code.highcharts.com/highcharts.js"></script>
+    <script src="https://code.highcharts.com/modules/exporting.js"></script>
     <script src="https://code.highcharts.com/highcharts-more.js"></script>
 
     <script src="/static/js/dagre.min.js"></script>
@@ -51,12 +52,26 @@
 				opacity: 0.3;
         filter: grayscale(100%);
 			}
+
+      .causal-flow-charts {
+        display: flex;
+        justify-content: center;
+        flex-wrap: wrap;
+      }
+
+      .causal-flow-charts div>div {
+        text-align: center;
+      }
     </style>
 
     <!-- Javascript to modify tables -->
     <script type="text/javascript">
+      Highcharts.SVGRenderer.prototype.symbols.cross = function (x, y, w, h) {
+        return ['M', x, y, 'L', x + w / 1.5, y + h / 1.5, 'M', x + w / 1.5, y, 'L', x, y + h / 1.5, 'z'];
+      }
+      
       function plotCausal(mutation, regulator, bicluster) {
-        document.getElementById("expressions-name").innerHTML = `${mutation}&nbsp;<span>-&gt;</span>&nbsp;${regulator}&nbsp;<span>-&gt;</span>&nbsp;${bicluster}`
+        document.getElementById("expressions-name").innerHTML = `${mutation}&nbsp;<span>🡒</span>&nbsp;${regulator}&nbsp;<span>🡒</span>&nbsp;${bicluster}`
         
         let request = new XMLHttpRequest()
 				request.open("GET", `/bicluster-causal-analysis/${mutation.trim()}/${regulator.trim()}/${bicluster.trim()}`, true)
@@ -65,11 +80,18 @@
 				request.onload = (event) => {
           try {
             let data = JSON.parse(request.response)
-          
+            
+            document.getElementById("gene-expression-stats").innerHTML = `T = ${data.mutation_gene_expression.stats[0].toPrecision(3)}, p = ${data.mutation_gene_expression.stats[1].toExponential(2)}`
             $('#gene-expression-boxplot').highcharts({
-              chart: {type: 'boxplot'},
-              legend: {enabled: true},
-              title: {text: ''},
+              chart: {
+                type: 'boxplot'
+              },
+              legend: {
+                enabled: true
+              },
+              title: {
+                text: ''
+              },
               xAxis: {
                 tickInterval: 1,
                 labels: {
@@ -78,7 +100,7 @@
                     return ["WT", "Mutated"][this.value]
                   },
                 }
-            },
+              },
               yAxis: {
                 title: {
                   text: data.mutation_gene_expression.name,
@@ -99,10 +121,17 @@
               },
             });
 
+            document.getElementById("eigengene-stats").innerHTML = `T = ${data.bicluster_eigengene_expression.stats[0].toPrecision(3)}, p = ${data.bicluster_eigengene_expression.stats[1].toExponential(2)}`
             $('#eigengene-boxplot').highcharts({
-              chart: {type: 'boxplot'},
-              legend: {enabled: true},
-              title: {text: ''},
+              chart: {
+                type: 'boxplot'
+              },
+              legend: {
+                enabled: true
+              },
+              title: {
+                text: ''
+              },
               xAxis: {
                 tickInterval: 1,
                 labels: {
@@ -111,7 +140,7 @@
                     return ["WT", "Mutated"][this.value]
                   },
                 }
-            },
+              },
               yAxis: {
                 title: {
                   text: data.bicluster_eigengene_expression.name,
@@ -132,10 +161,67 @@
               },
             });
 
+            const phenotypes = ["Sarcomatoid", "Epithelioid", "Desmoplastic", "Biphasic"]
+            const phenotypeColors = {
+              'Sarcomatoid': '#2c6dd4',
+              'Epithelioid': '#8a171a',
+              'Desmoplastic': '#ed2024',
+              'Biphasic': '#faa41a',
+              'NA': 'grey',
+            }
+  
+            document.getElementById("scatterplot-stats").innerHTML = `R = ${data.scatter.stats[0].toPrecision(3)}, p = ${data.scatter.stats[1].toExponential(2)}`
+            $('#scatterplot').highcharts({
+              chart: {
+                type: 'scatter'
+              },
+              legend: {
+                enabled: true
+              },
+              title: {
+                text: ''
+              },
+              xAxis: {
+                title: {
+                  text: data.mutation_gene_expression.name,
+                },
+              },
+              yAxis: {
+                title: {
+                  text: data.bicluster_eigengene_expression.name,
+                },
+              },
+              series: [
+                ...data.scatter.data,
+                {
+                  type: 'line',
+                  name: 'Regression Line',
+                  data: data.scatter.regression,
+                  marker: {
+                    enabled: false
+                  },
+                  states: {
+                    hover: {
+                      lineWidth: 0
+                    }
+                  },
+                  enableMouseTracking: false,
+                  color: "#FF0000"
+                },
+              ]
+            });
+
+            document.getElementById("residual-stats").innerHTML = `T = ${data.residual.stats[0].toPrecision(3)}, p = ${data.residual.stats[1].toExponential(2)}`
             $('#residual-boxplot').highcharts({
-              chart: {type: 'boxplot'},
-              legend: {enabled: true},
-              title: {text: ''},
+              chart: {
+                type: 'boxplot'
+              },
+              legend: {
+                enabled: true
+              },
+              title: {
+                text: ''
+              },
               xAxis: {
                 tickInterval: 1,
                 labels: {
@@ -144,7 +230,7 @@
                     return ["WT", "Mutated"][this.value]
                   },
                 }
-            },
+              },
               yAxis: {
                 title: {
                   text: data.residual.name,
@@ -160,7 +246,7 @@
               }],
               plotOptions: {
                 series: {
-                    pointWidth: 100
+                  pointWidth: 100
                 }
               },
             });
@@ -272,7 +358,7 @@
           { name: 'Epithelioid', color: '#8a171a'},
           { name: 'Desmoplastic', color: '#ed2024'},
           { name: 'Biphasic', color: '#faa41a'},
-          { name: 'NA', color: '#ed2024'},
+          { name: 'NA', color: 'grey'},
           ]
       });
       $('#enrichment-graph').highcharts({
@@ -535,7 +621,7 @@
               <span style='color:#000099'>{{ bicluster | upper }}</span>
             </td>
             <td valign="middle">
-              <button class="btn btn-primary btn-small expression-viewer" data-toggle="modal" data-target="#expressions-modal" mutation="{{cf1[0]}}" regulator="{{cf1[1]}}" bicluster="{{bicluster}}">View Causal Flow</button>  
+              <button class="btn btn-primary btn-small expression-viewer" data-toggle="modal" data-target="#expressions-modal" mutation="{{cf1[0]}}" regulator="{{cf1[1]}}" bicluster="{{bicluster}}" style="display: {{ cf1[2] }};">View Causal Flow</button>  
             </td>
           </tr>
           {% endfor %}
@@ -608,10 +694,23 @@
         <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
         <h4 class="modal-title" id="myModalLabel">Causal Flow&nbsp;<div id="expressions-name" style="display: inline;"></div></h4>
       </div>
-      <div class="modal-body">
-        <div id="gene-expression-boxplot" style="width: 350px; height: 300px; display: inline-block;"></div>
-        <div id="eigengene-boxplot" style="width: 350px; height: 300px; display: inline-block;"></div>
-        <div id="residual-boxplot" style="width: 350px; height: 300px; display: inline-block;"></div>
+      <div class="modal-body causal-flow-charts">
+        <div>
+          <div id="gene-expression-stats"></div>
+          <div id="gene-expression-boxplot" style="width: 350px; height: 300px; display: inline-block;"></div>
+        </div>
+        <div>
+          <div id="eigengene-stats"></div>
+          <div id="eigengene-boxplot" style="width: 350px; height: 300px; display: inline-block;"></div>
+        </div>
+        <div>
+          <div id="scatterplot-stats"></div>
+          <div id="scatterplot" style="width: 350px; height: 435px; display: inline-block;"></div>
+        </div>
+        <div>
+          <div id="residual-stats"></div>
+          <div id="residual-boxplot" style="width: 350px; height: 300px; display: inline-block;"></div>
+        </div>
       </div>
     </div>
   </div>

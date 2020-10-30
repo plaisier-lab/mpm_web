@@ -41,7 +41,7 @@ import pandas
 import numpy as np
 from sklearn.linear_model import LinearRegression
 # import rpy2.robjects as robjects
-from scipy.stats import hypergeom
+from scipy import stats
 
 
 NUM_PARTS = 5
@@ -131,7 +131,7 @@ GRAPH_COLOR_MAP = {
 
 def phyper(x, M, n, bigN, lower_tail=False):
     """uses scipy.stats to compute hypergeometric overlap p-value"""
-    return 1 - hypergeom.cdf(float(x), float(M), float(n), float(bigN))
+    return 1 - stats.hypergeom.cdf(float(x), float(M), float(n), float(bigN))
 
 
 def submat_data(submat, col_indexes):
@@ -354,8 +354,8 @@ def bicluster_causal_analysis(mutation=None, regulator=None, bicluster=None):
     """
 
     js_mutation_gene_expression_data = []
-    js_mutation_gene_expression_colors = ["#AAAAAA", "#FF0000"]
-    js_mutation_gene_expression_name = mutation + " Expression"
+    js_mutation_gene_expression_colors = ["#AAAAAA", "#ff2b2b"]
+    js_mutation_gene_expression_name = regulator + " Expression"
 
     c.execute("""
         SELECT ge.value, bd.value, pt.name FROM gene_expression ge
@@ -396,12 +396,15 @@ def bicluster_causal_analysis(mutation=None, regulator=None, bicluster=None):
         "fillColor": js_mutation_gene_expression_colors[1],
     })
 
+    # do statistics on the data we have
+    js_mutation_gene_expression_stats = stats.ttest_ind(mutated, wt)
+
     """
     eigengene expression
     """
 
     js_bicluster_eigengene_expression_data = []
-    js_bicluster_eigengene_expression_colors = ["#AAAAAA", "#FF0000"]
+    js_bicluster_eigengene_expression_colors = ["#AAAAAA", "#ff2b2b"]
     js_bicluster_eigengene_expression_name = bicluster + " Expression"
 
     c.execute("""
@@ -443,13 +446,16 @@ def bicluster_causal_analysis(mutation=None, regulator=None, bicluster=None):
         "fillColor": js_bicluster_eigengene_expression_colors[1],
     })
 
+    # do statistics on the data we have
+    js_bicluster_eigengene_expression_stats = stats.ttest_ind(mutated, wt)
+
     """
     residual aka "bicluster conditioned on mutation expression"
     """
 
     js_bicluster_residual_data = []
-    js_bicluster_residual_colors = ["#AAAAAA", "#FF0000"]
-    js_bicluster_residual_name = bicluster + " Expression Conditioned on " + mutation + " Expression"
+    js_bicluster_residual_colors = ["#AAAAAA", "#ff2b2b"]
+    js_bicluster_residual_name = bicluster + " Expression Conditioned on " + regulator + " Expression"
 
     # we already got the gene expression and eigengene expression data previously, so no sql fetches here
     flattened_gene_expression = [(i[0],) for i in gene_expression_data]
@@ -489,21 +495,119 @@ def bicluster_causal_analysis(mutation=None, regulator=None, bicluster=None):
         "fillColor": js_bicluster_residual_colors[1],
     })
 
+    # do statistics on the data we have
+    js_bicluster_residual_stats = stats.ttest_ind(mutated, wt)
+
+    """
+    scatter plot:
+    x-axis: TF gene expression
+    y-axis: bicluster eigengenes
+    gene_expression_data: (float, boolean, Patient)
+    eigengene_data: (float, boolean, Patient)
+    """
+
+    # intersect gene_expression_data and eigengene_data by patient
+    gene_expression_data_by_patient = {}
+    for datum in gene_expression_data:
+        gene_expression_data_by_patient[datum[2]] = (datum[0], datum[1])
+    
+    eigengene_data_by_patient = {}
+    for datum in eigengene_data:
+        eigengene_data_by_patient[datum[2]] = (datum[0], datum[1])
+    
+    js_scatterplot_data = {}
+    for phenotype in ENRICHMENT_PHENOTYPES:
+        js_scatterplot_data[phenotype] = {}
+        
+        js_scatterplot_data[phenotype][0] = {
+            "name": "{} (Mut)".format(phenotype),
+            "data": [],
+            "color": GRAPH_COLOR_MAP[phenotype],
+            "marker": {
+                "symbol": "circle",
+                "radius": 3,
+            },
+        }
+
+        js_scatterplot_data[phenotype][1] = {
+            "name": "{} (WT)".format(phenotype),
+            "data": [],
+            "color": GRAPH_COLOR_MAP[phenotype],
+            "marker": {
+                "symbol": "cross",
+                "lineColor": None,
+                "lineWidth": 2,
+            },
+        }
+
+    use_table = gene_expression_data_by_patient
+    if len(eigengene_data) < len(gene_expression_data):
+        use_table = eigengene_data_by_patient
+    
+    c.execute("""
+        SELECT p.name, pd.phenotype_string FROM pheno_data pd
+            JOIN patient p ON pd.patient_id=p.id
+            JOIN phenotype pt ON pd.phenotype_id=pt.id
+            WHERE pt.name="histology_WHO" 
+            AND pd.phenotype_string <> 'NA';
+    """)
+    phenotype_data = c.fetchall()
+
+    phenotype_by_patient = {}
+    for datum in phenotype_data:
+        phenotype_by_patient[datum[0]] = datum[1]
+    
+    all_data = []
+    highest_x = -10000
+    lowest_x = 10000
+    for patient in use_table.keys():
+        if phenotype_by_patient[patient] in js_scatterplot_data:
+            x = gene_expression_data_by_patient[patient][0]
+            y = eigengene_data_by_patient[patient][0]
+            boolean = eigengene_data_by_patient[patient][1]
+
+            js_scatterplot_data[phenotype_by_patient[patient]][boolean]["data"].append([x, y])
+            all_data.append([x, y])
+
+            if x < lowest_x:
+                lowest_x = x
+            
+            if x > highest_x:
+                highest_x = x
+    
+    js_scatterplot_stats = stats.pearsonr([i[0] for i in all_data], [i[1] for i in all_data])
+
+    js_scatterplot_data_array = []
+    for phenotype in js_scatterplot_data.keys():
+        js_scatterplot_data_array.append(js_scatterplot_data[phenotype][1])
+        js_scatterplot_data_array.append(js_scatterplot_data[phenotype][0])
+
     return json.dumps({
         "mutation_gene_expression": {
             "data": js_mutation_gene_expression_data,
+            "stats": js_mutation_gene_expression_stats,
             "colors": js_mutation_gene_expression_colors,
             "name": js_mutation_gene_expression_name,
         },
         "bicluster_eigengene_expression": {
             "data": js_bicluster_eigengene_expression_data,
+            "stats": js_bicluster_eigengene_expression_stats,
             "colors": js_bicluster_eigengene_expression_colors,
             "name": js_bicluster_eigengene_expression_name,
         },
         "residual": {
             "data": js_bicluster_residual_data,
+            "stats": js_bicluster_residual_stats,
             "colors": js_bicluster_residual_colors,
             "name": js_bicluster_residual_name,
+        },
+        "scatter": {
+            "data": js_scatterplot_data_array,
+            "stats": js_scatterplot_stats,
+            "regression": [
+                [lowest_x, regression.coef_[0] * lowest_x + regression.intercept_],
+                [highest_x, regression.coef_[0] * highest_x + regression.intercept_]
+            ]
         },
     })
 
@@ -631,8 +735,21 @@ FROM causal_flow WHERE bicluster_id=%s""", [bc_pk])
             else:
                 c.execute("""SELECT locus_name FROM locus WHERE id=%s """, [m1[3]]) # test: make sure this gets loci
                 mut = c.fetchone()[0]
+            
+            c.execute("""
+                SELECT COUNT(*) > 0 FROM bueno_deep_filter bd
+                    JOIN somatic_mutation sm ON bd.somatic_mutation_id = sm.id
+                    LEFT JOIN gene g2 ON sm.ext_id = g2.id
+                    LEFT JOIN locus l on sm.locus_id = l.id
+                    WHERE g2.symbol=%s OR l.locus_name=%s;
+            """, [mut, mut])
+            has_graphs = c.fetchone()[0]
+            if has_graphs > 0:
+                graph_button_style = "inline"
+            else:
+                graph_button_style = "none"
 
-            causalFlows.append([mut, g1])            
+            causalFlows.append([mut, g1, graph_button_style])
 
             elements.append({'data': { 'id': 'mut%d' % cf_som_mut_id, 'name': mut}, 'classes': 'genotype' }) # feature: differnet colors for genes vs loci
             elements.append({'data': { 'id': 'cf%d' % cf_pk, 'source': 'mut%d' % cf_som_mut_id, 'target': 'reg%d' % cf_reg_id } })

@@ -180,7 +180,7 @@ for gene1 in gexp1.index:
     if str(gene1) in entrez2symbol:
         g1 = Gene(symbol=entrez2symbol[str(gene1)], entrez=int(gene1))
         db.session.add(g1)
-        genes[gene1] = g1
+        genes[int(gene1)] = g1
 
 db.session.commit()
 
@@ -195,7 +195,7 @@ for patient1 in gexp1.columns:
     for gene1 in gexp1.index:
         if gene1 in genes and patient_check.match(patient1):
             ge1 = GeneExpression(
-                exp_dataset_id=ed1.id, patient_id=patients[patient1].id, gene_id=genes[gene1].id, value=float(gexp1[patient1][gene1]))
+                exp_dataset_id=ed1.id, patient_id=patients[patient1].id, gene_id=genes[int(gene1)].id, value=float(gexp1[patient1][gene1]))
             db.session.add(ge1)
             gene_expression_count = gene_expression_count  +1
         
@@ -560,14 +560,7 @@ SELECT CONCAT_WS(
         CONCAT(g2.entrez, '_', sm.mutation_type)
     ) AS mutation,
     g.symbol AS regulator,
-    b.name AS bicluster,
-    CONCAT_WS(
-        '',
-        l.id,
-        g2.id
-    ) AS mutation_id,
-    tf.id AS regulator_id,
-    b.id AS bicluster_id
+    b.name AS bicluster
 FROM causal_flow cf
     JOIN bicluster b ON cf.bicluster_id=b.id
     JOIN tf_regulator tf ON cf.regulator_id=tf.id
@@ -598,7 +591,7 @@ def interpret_causality_summary(filename, bicluster_prefix):
             regulator = int(split[1]) # entrez id
         
         bicluster = int(bicluster_number_regex.findall(split[2])[0]) # digits at end of bicluster name
-        bicluster_prefix_override = ""
+        bicluster_prefix_override = None
         if bicluster_prefix_regex.match(split[2]):
             bicluster_prefix_override = bicluster_prefix_regex.match(split[2]).group(0)
 
@@ -624,11 +617,12 @@ def interpret_causality_summary(filename, bicluster_prefix):
             if key in regulator_bicluster_to_id: # we know we have a full unambiguous path if we find ourselves in here
                 mutation, leo_nb_atob, mlogp_m_atob, is_locus, bicluster_prefix_override = regulator_bicluster_to_id[key]
 
-                if bicluster_prefix == None:
-                    bicluster_prefix = bicluster_prefix_override
+                used_bicluster_prefix = bicluster_prefix_override
+                if bicluster_prefix != None:
+                    used_bicluster_prefix = bicluster_prefix
 
                 mutation_name = "{}_{}".format(mutation[0], mutation[1])
-                bicluster_name = "{}_{}".format(bicluster_prefix, bicluster)
+                bicluster_name = "{}_{}".format(used_bicluster_prefix, bicluster)
 
                 if bicluster_name not in biclusters:
                     continue
