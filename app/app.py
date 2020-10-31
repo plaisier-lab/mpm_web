@@ -220,7 +220,7 @@ def cluster_data(cursor, cluster_id):
     return data
 
 
-def subtype_enrichment(cursor, cluster_id, phenotype_name):
+def subtype_enrichment(cursor, cluster_id, phenotype_name, phenotype_min_max):
     cursor.execute("""SELECT g.entrez from bic_gene bg
         JOIN gene g ON bg.gene_id=g.id WHERE bicluster_id=%s""", [cluster_id])
     genes = [row[0] for row in cursor.fetchall()]
@@ -244,20 +244,25 @@ def subtype_enrichment(cursor, cluster_id, phenotype_name):
 
     # above is exactly like boxplot
     # now make a phenotype map
-    # cursor.execute("""SELECT p.name, pt.name FROM patient p JOIN phenotypes pt ON p.phenotype_id=pt.id
-    #    WHERE pt.name <> 'NA'""")
-    cursor.execute("""SELECT p.name, pd.phenotype_string FROM pheno_data pd
+    cursor.execute("""SELECT p.name, pd.phenotype_string, pd.phenotype_value FROM pheno_data pd
         JOIN patient p ON pd.patient_id=p.id
         JOIN phenotype pt ON pd.phenotype_id=pt.id
-        WHERE pt.name=%s 
-            AND pd.phenotype_string <> 'NA'""",
+        WHERE pt.name=%s;""",
         [phenotype_name]
     )
-    # histology_WHO phenotype lookup ^^^
+    data = cursor.fetchall()
 
-    ptmap = {patient: phenotype for patient, phenotype in cursor.fetchall()} # don't change
-    all_patients = {patient for patient in ptmap.keys()} # don't change
-    phenotypes = {phenotype for phenotype in ptmap.values()} # don't change
+    string_ptmap = {patient: phenotype for patient, phenotype, _ in data} # don't change
+    value_ptmap = {patient: value for patient, _, value in data} # don't change
+    all_patients = {patient for patient in string_ptmap.keys()} # don't change
+
+    if phenotype_min_max == None:
+        phenotypes = {phenotype for phenotype in string_ptmap.values()} # don't change
+    else: # build range list if we're dealing with continuous values
+        phenotypes = []
+        step = (phenotype_min_max[1] - phenotype_min_max[0]) / 5
+        for i in range(0, 5):
+            phenotypes.append((step * i + phenotype_min_max[0], step * (i + 1) + phenotype_min_max[0]))
 
     # we use the submat_data function to sort our patients
     # lol part 1. also, i hate this sql statement. despite the obvious injection risk, this is fine. genes_string and included_patients_string is generated from an unexploitable source
@@ -287,8 +292,17 @@ def subtype_enrichment(cursor, cluster_id, phenotype_name):
 
     # group patients into phenotype groups.
     # NOTE: the ptmap items need to be sorted, otherwise groupby fails to group correctly
-    pt_patients = itertools.groupby(sorted(ptmap.items(), key=lambda pair: pair[1]), key=lambda pair: pair[1])
-    pt_patients = {phenotype: set(map(lambda p: p[0], patients)) for phenotype, patients in pt_patients}
+    if phenotype_min_max == None:
+        pt_patients = itertools.groupby(sorted(string_ptmap.items(), key=lambda pair: pair[1]), key=lambda pair: pair[1])
+        pt_patients = {phenotype: set(map(lambda p: p[0], patients)) for phenotype, patients in pt_patients}
+    else: # build the phenotype quintiles
+        pt_patients = {}
+        for min_max in phenotypes:
+            pt_patients[min_max] = []
+            for patient in value_ptmap.keys():
+                value = value_ptmap[patient]
+                if value >= min_max[0] and (value < min_max[1] or (value == phenotype_min_max[1] and phenotype_min_max[1] == min_max[1])):
+                    pt_patients[min_max].append(patient)
 
     num_columns = len(sorted_patient_names)
     cols_per_part = int(math.floor(num_columns / NUM_PARTS))
@@ -661,15 +675,25 @@ def bicluster_expression_graph(bicluster=None, phenotype_name="histology_WHO"):
 
     # Prepare graph plotting data
     all_boxplot_data = cluster_data(c, bc_pk)
-    enrichment_pvalues, min_enrichment_pvalue, max_enrichment_pvalue = subtype_enrichment(c, bc_pk, phenotype_name)
+    enrichment_pvalues, min_enrichment_pvalue, max_enrichment_pvalue = subtype_enrichment(c, bc_pk, phenotype_name, phenotype_min_max)
     js_enrichment_data = []
     js_enrichment_colors = []
 
-    if phenotype_min_max == None:
-        for part in enrichment_pvalues:
+    for part in enrichment_pvalues:
+        if phenotype_min_max == None:
             for phenotype in PHENOTYPES_DICT[phenotype_name]:
                 js_enrichment_data.append([phenotype, part[phenotype]])
-                js_enrichment_colors.append(GRAPH_COLOR_MAP[phenotype]) # TODO: make the color information dynamically load in
+                js_enrichment_colors.append(GRAPH_COLOR_MAP[phenotype])
+        else:
+            index = 1
+            for key in part.keys():
+                key_range = "[" + "{:.2f}".format(key[0]) + "," + "{:.2f}".format(key[1]) + ")"
+                if index == 5:
+                    key_range = "[" + "{:.2f}".format(key[0]) + "," + "{:.2f}".format(key[1]) + "]"
+                
+                js_enrichment_data.append(["Phenotype Quintile " + str(index) + ": " + key_range, part[key]])
+                js_enrichment_colors.append(get_phenotype_color(phenotype_name, key[0], phenotype_min_max))
+                index = index + 1
 
     enrichment_upper = -math.log10(0.05/30.0)
     enrichment_lower = math.log10(0.05/30.0)
