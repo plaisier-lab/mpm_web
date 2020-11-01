@@ -152,6 +152,7 @@ SELECTABLE_PHENOTYPES = [
     ("Plasma Cells", "Plasma.cells"),
 ]
 
+PHENOTYPE_INDEX_TO_UINAME = {item[1]: item[0] for item in SELECTABLE_PHENOTYPES}
 
 # def phyper(q, m, n, k, lower_tail=False):
 #    """calls the R function phyper"""
@@ -682,7 +683,6 @@ def bicluster_causal_analysis(mutation=None, regulator=None, bicluster=None, phe
 
     db.close()
 
-
 @app.route('/bicluster-expression-graph/<bicluster>/<phenotype_name>')
 def bicluster_expression_graph(bicluster=None, phenotype_name="histology_WHO"):
     db = dbconn()
@@ -757,12 +757,14 @@ def bicluster_expression_graph(bicluster=None, phenotype_name="histology_WHO"):
         color = None
         if phenotype_min_max == None:
             color = GRAPH_COLOR_MAP[string_ptmap[patients[i]]]
+            name = patients[i]
         else:
             color = get_phenotype_color(phenotype_name, value_ptmap[patients[i]], phenotype_min_max)
+            name = patients[i] + " - " + PHENOTYPE_INDEX_TO_UINAME[phenotype_name] + ": " + "{:.2f}".format(value_ptmap[patients[i]])
 
         js_boxplot_colors.append(color)
         js_boxplot_data.append({
-            "name": patients[i],
+            "name": name,
             "low": item[1],
             "q1":  item[2],
             "median": item[3],
