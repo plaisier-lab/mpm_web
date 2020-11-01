@@ -208,11 +208,17 @@ def cluster_data(cursor, cluster_id):
     excluded_patients_string = "(%s)" % ','.join(map(lambda p: '\'%s\'' % p, excluded_patients))
 
     all_patients_string = "(%s)" % ",".join(map(lambda p: '\'%s\'' % p, included_patients + excluded_patients))
-    cursor.execute("SELECT value FROM gene_expression ge " # at the end of this, we're getting values from the gene_expression table
-        + "JOIN gene g ON ge.gene_id=g.id " # we want to search based on gene entrez, so we JOIN the gene table with the gene expression table
-        + "JOIN patient p ON ge.patient_id=p.id " # we want to also search based on patient name, so we JOIN the patient table with the gene expression table
-        + "WHERE g.entrez IN " + genes_string + " " # we're looking for gene entrez ids that we found in the bic_gene table based on the input bicluster id
-        + "AND p.name IN " + all_patients_string + ";") # all patient names
+    cursor.execute(
+        """SELECT value FROM gene_expression ge
+        JOIN gene g ON ge.gene_id=g.id
+        JOIN patient p ON ge.patient_id=p.id
+        WHERE g.entrez IN (
+            SELECT g.entrez from bic_gene bg
+            JOIN gene g ON bg.gene_id=g.id WHERE bicluster_id=%s
+        )
+        AND p.name IN """ + all_patients_string + """;""",
+        [cluster_id]
+    )
     result = [row[0] for row in cursor.fetchall()]
     submat = np.ndarray((gene_count, len(included_patients + excluded_patients)), dtype=float, buffer=np.array(result), offset=0, strides=None, order=None) # we want a submatrix (whatever that is) of all the different gene expression values we found
     data = submat_data(submat, included_patients + excluded_patients) # throw the submatrix at this function, does statistics on the data
@@ -266,22 +272,35 @@ def subtype_enrichment(cursor, cluster_id, phenotype_name, phenotype_min_max):
 
     # we use the submat_data function to sort our patients
     # lol part 1. also, i hate this sql statement. despite the obvious injection risk, this is fine. genes_string and included_patients_string is generated from an unexploitable source
-    cursor.execute("SELECT value FROM gene_expression ge " # at the end of this, we're getting values from the gene_expression table
-        + "JOIN gene g ON ge.gene_id=g.id " # we want to search based on gene entrez, so we JOIN the gene table with the gene expression table
-        + "JOIN patient p ON ge.patient_id=p.id " # we want to also search based on patient name, so we JOIN the patient table with the gene expression table
-        + "WHERE g.entrez IN " + genes_string + " " # we're looking for gene entrez ids that we found in the bic_gene table based on the input bicluster id
-        + "AND p.name IN " + included_patients_string + ";") # we're looking for patient names that we found in the patient table based on the given bicluster idnames that we found in the patient table based on the given bicluster id
+    cursor.execute(
+        """SELECT value FROM gene_expression ge
+        JOIN gene g ON ge.gene_id=g.id
+        JOIN patient p ON ge.patient_id=p.id
+        WHERE g.entrez IN (
+            SELECT g.entrez from bic_gene bg
+            JOIN gene g ON bg.gene_id=g.id WHERE bicluster_id=%s
+        )
+        AND p.name IN""" + included_patients_string + """;""",
+        [cluster_id]
+    )
     included_patients_result = [row[0] for row in cursor.fetchall()]
     in_submat = np.ndarray((gene_count, len(included_patients)), dtype=float, buffer=np.array(included_patients_result), offset=0, strides=None, order=None) # we want a submatrix (whatever that is) of all the different gene expression values we found
     in_data = submat_data(in_submat, included_patients) # throw the submatrix at this function, does statistics on the data
     sorted_in_names = [row[0] for row in in_data] # NOTE: due to my changes to account for the gene_expression table, row[0] is now a PATIENT NAME, not a PATIENT INDEX.
 
     # lol part 2. also, i hate this sql statement. despite the obvious injection risk, this is fine. genes_string and excluded_patients_string is generated from an unexploitable source
-    cursor.execute("SELECT value FROM gene_expression ge " # at the end of this, we're getting values from the gene_expression table
-        + "JOIN gene g ON ge.gene_id=g.id " # we want to search based on gene entrez, so we JOIN the gene table with the gene expression table
-        + "JOIN patient p ON ge.patient_id=p.id " # we want to also search based on patient name, so we JOIN the patient table with the gene expression table
-        + "WHERE g.entrez IN " + genes_string + " " # we're looking for gene entrez ids that we found in the bic_gene table based on the input bicluster id
-        + "AND p.name IN " + excluded_patients_string + ";") # we're looking for patient names that we DIDN'T find in the patient table based on the given bicluster idfor patient names that we DIDN'T find in the patient table based on the given bicluster id
+    # TODO optimize sql
+    cursor.execute(
+        """SELECT value FROM gene_expression ge
+        JOIN gene g ON ge.gene_id=g.id
+        JOIN patient p ON ge.patient_id=p.id
+        WHERE g.entrez IN (
+            SELECT g.entrez from bic_gene bg
+            JOIN gene g ON bg.gene_id=g.id WHERE bicluster_id=%s
+        )
+        AND p.name IN """ + excluded_patients_string + """;""",
+        [cluster_id]
+    )
     excluded_patients_result = [row[0] for row in cursor.fetchall()]
     ex_submat = np.ndarray((gene_count, len(excluded_patients)), dtype=float, buffer=np.array(excluded_patients_result), offset=0, strides=None, order=None) # we want a submatrix (whatever that is) of all the different gene expression values we found 
     ex_data = submat_data(ex_submat, excluded_patients)    
