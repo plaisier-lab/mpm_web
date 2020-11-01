@@ -173,6 +173,11 @@
   
             document.getElementById("scatterplot-stats").innerHTML = `R = ${data.scatter.stats[0].toPrecision(3)}, p = ${data.scatter.stats[1].toExponential(2)}`
             $('#scatterplot').highcharts({
+              tooltip: {
+                formatter: function () {
+                  return `<b>${this.key}</b><br>${data.mutation_gene_expression.name}: ${this.x}<br>${data.bicluster_eigengene_expression.name}: ${this.y}<br>`
+                }
+              },
               chart: {
                 type: 'scatter'
               },

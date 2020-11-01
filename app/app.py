@@ -373,13 +373,22 @@ def subtype_enrichment(cursor, cluster_id, phenotype_name, phenotype_min_max):
 
     return pvalues, min_pvalue, max_pvalue
 
-def get_phenotype_min_max(cursor, phenotype_name):
-    cursor.execute("""
-        SELECT phenotype_value FROM pheno_data pd
-            JOIN patient p ON pd.patient_id=p.id
-            JOIN phenotype pt ON pd.phenotype_id=pt.id
-            WHERE pt.name=%s;
-    """, [phenotype_name])
+def get_phenotype_min_max(cursor, phenotype_name, bueno_deep_filter=False):
+    if bueno_deep_filter == False:
+        cursor.execute("""
+            SELECT phenotype_value FROM pheno_data pd
+                JOIN patient p ON pd.patient_id=p.id
+                JOIN phenotype pt ON pd.phenotype_id=pt.id
+                WHERE pt.name=%s;
+        """, [phenotype_name])
+    else:
+        cursor.execute("""
+            SELECT phenotype_value FROM pheno_data pd
+                JOIN patient p ON pd.patient_id=p.id
+                JOIN phenotype pt ON pd.phenotype_id=pt.id
+                WHERE pt.name=%s
+                AND p.id IN (SELECT DISTINCT patient_id FROM bueno_deep_filter);
+        """, [phenotype_name])
     data = cursor.fetchall()
     phenotype_data = [item[0] for item in data]
 
@@ -576,6 +585,8 @@ def bicluster_causal_analysis(mutation=None, regulator=None, bicluster=None, phe
     eigengene_data: (float, boolean, Patient)
     """
 
+    phenotype_min_max = get_phenotype_min_max(c, phenotype_name, True)
+
     # intersect gene_expression_data and eigengene_data by patient
     gene_expression_data_by_patient = {}
     for datum in gene_expression_data:
@@ -586,23 +597,45 @@ def bicluster_causal_analysis(mutation=None, regulator=None, bicluster=None, phe
         eigengene_data_by_patient[datum[2]] = (datum[0], datum[1])
     
     js_scatterplot_data = {}
-    for phenotype in PHENOTYPES_DICT[phenotype_name]:
-        js_scatterplot_data[phenotype] = {}
-        
-        js_scatterplot_data[phenotype][0] = {
-            "name": "{} (Mut)".format(phenotype),
+    if phenotype_min_max == None:
+        for phenotype in PHENOTYPES_DICT[phenotype_name]:
+            js_scatterplot_data[phenotype] = {}
+            
+            js_scatterplot_data[phenotype][0] = {
+                "name": "{} (Mut)".format(phenotype),
+                "data": [],
+                "color": GRAPH_COLOR_MAP[phenotype],
+                "marker": {
+                    "symbol": "circle",
+                    "radius": 3,
+                },
+            }
+
+            js_scatterplot_data[phenotype][1] = {
+                "name": "{} (WT)".format(phenotype),
+                "data": [],
+                "color": GRAPH_COLOR_MAP[phenotype],
+                "marker": {
+                    "symbol": "cross",
+                    "lineColor": None,
+                    "lineWidth": 2,
+                },
+            }
+    else:
+        js_scatterplot_data[0] = {
+            "name": "Mutated",
             "data": [],
-            "color": GRAPH_COLOR_MAP[phenotype],
+            "color": GRAPH_COLOR_GRADIENTS[phenotype_name][1],
             "marker": {
                 "symbol": "circle",
                 "radius": 3,
             },
         }
 
-        js_scatterplot_data[phenotype][1] = {
-            "name": "{} (WT)".format(phenotype),
+        js_scatterplot_data[1] = {
+            "name": "WT",
             "data": [],
-            "color": GRAPH_COLOR_MAP[phenotype],
+            "color": GRAPH_COLOR_GRADIENTS[phenotype_name][1],
             "marker": {
                 "symbol": "cross",
                 "lineColor": None,
@@ -615,42 +648,59 @@ def bicluster_causal_analysis(mutation=None, regulator=None, bicluster=None, phe
         use_table = eigengene_data_by_patient
     
     c.execute("""
-        SELECT p.name, pd.phenotype_string FROM pheno_data pd
+        SELECT p.name, pd.phenotype_string, pd.phenotype_value FROM pheno_data pd
             JOIN patient p ON pd.patient_id=p.id
             JOIN phenotype pt ON pd.phenotype_id=pt.id
-            WHERE pt.name=%s 
-            AND pd.phenotype_string <> 'NA';
+            WHERE pt.name=%s;
     """, [phenotype_name])
     phenotype_data = c.fetchall()
 
-    phenotype_by_patient = {}
-    for datum in phenotype_data:
-        phenotype_by_patient[datum[0]] = datum[1]
+    string_by_patient = {patient: string for patient, string, _ in phenotype_data}
+    value_by_patient = {patient: value for patient, _, value in phenotype_data}
     
     all_data = []
     highest_x = -10000
     lowest_x = 10000
     for patient in use_table.keys():
-        if phenotype_by_patient[patient] in js_scatterplot_data:
-            x = gene_expression_data_by_patient[patient][0]
-            y = eigengene_data_by_patient[patient][0]
-            boolean = eigengene_data_by_patient[patient][1]
+        x = gene_expression_data_by_patient[patient][0]
+        y = eigengene_data_by_patient[patient][0]
+        boolean = eigengene_data_by_patient[patient][1]
 
-            js_scatterplot_data[phenotype_by_patient[patient]][boolean]["data"].append([x, y])
-            all_data.append([x, y])
-
-            if x < lowest_x:
-                lowest_x = x
+        if phenotype_min_max == None:
+            if string_by_patient[patient] not in js_scatterplot_data:
+                continue
             
-            if x > highest_x:
-                highest_x = x
+            js_scatterplot_data[string_by_patient[patient]][boolean]["data"].append({
+                "x": x,
+                "y": y,
+                "name": patient,
+            })
+        else:
+            js_scatterplot_data[boolean]["data"].append({
+                "x": x,
+                "y": y,
+                "name": patient + " - " + PHENOTYPE_INDEX_TO_UINAME[phenotype_name] + ": " + "{:.2f}".format(value_by_patient[patient]),
+                "color": get_phenotype_color(phenotype_name, value_by_patient[patient], phenotype_min_max),
+            })
+
+        all_data.append([x, y])
+
+        if x < lowest_x:
+            lowest_x = x
+        
+        if x > highest_x:
+            highest_x = x
     
     js_scatterplot_stats = stats.pearsonr([i[0] for i in all_data], [i[1] for i in all_data])
 
     js_scatterplot_data_array = []
-    for phenotype in js_scatterplot_data.keys():
-        js_scatterplot_data_array.append(js_scatterplot_data[phenotype][1])
-        js_scatterplot_data_array.append(js_scatterplot_data[phenotype][0])
+    if phenotype_min_max == None:
+        for phenotype in js_scatterplot_data.keys():
+            js_scatterplot_data_array.append(js_scatterplot_data[phenotype][1])
+            js_scatterplot_data_array.append(js_scatterplot_data[phenotype][0])
+    else:
+        js_scatterplot_data_array.append(js_scatterplot_data[0])
+        js_scatterplot_data_array.append(js_scatterplot_data[1])
 
     return json.dumps({
         "mutation_gene_expression": {
