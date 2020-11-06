@@ -622,9 +622,14 @@ def interpret_causality_summary(filename, bicluster_prefix):
                     used_bicluster_prefix = bicluster_prefix
 
                 mutation_name = "{}_{}".format(mutation[0], mutation[1])
+
+                sif_mutation_name = mutation_name
+                if is_locus == False:
+                    sif_mutation_name = "{}_{}".format(entrez2symbol[str(mutation[0])], mutation[1])
+                
                 bicluster_name = "{}_{}".format(used_bicluster_prefix, bicluster)
 
-                if mutation_name not in sif_mutation_to_regulators:
+                if sif_mutation_name not in sif_mutation_to_regulators:
                     continue
 
                 if bicluster_name not in biclusters:
@@ -1027,7 +1032,7 @@ with open('data/postProcessed_clustersOfBiclusters_CNA_CNVkit.csv') as in_file:
 
 
 # handle somatic mutations and causal flows
-interpret_sif("./data/sifs/causalAndMechanistic_network_CNA_CNVkit_8_13_2019.sif")
+interpret_sif("./data/sifs/causalAndMechanistic_network_CNA_CNVkit_11_02_2020.sif")
 interpret_causality_summary("./data/causality_CNA_final_8_13_2019/causalitySummary_pita.csv", "pita")
 interpret_causality_summary("./data/causality_CNA_final_8_13_2019/causalitySummary_targetscan.csv", "targetscan")
 interpret_causality_summary("./data/causality_CNA_final_8_13_2019/causalitySummary_tfbs_db.csv", "tfbs_db")
