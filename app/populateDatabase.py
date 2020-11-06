@@ -488,9 +488,9 @@ def interpret_sif(filename):
     line = file.readline()
     while line:
         split = line.split(" ")
-        first = split[0]
-        command = split[1]
-        last = split[2]
+        first = split[0].strip()
+        command = split[1].strip()
+        last = split[2].strip()
 
         line = file.readline()
 
@@ -596,7 +596,7 @@ def interpret_causality_summary(filename, bicluster_prefix):
             bicluster_prefix_override = bicluster_prefix_regex.match(split[2]).group(0)
 
         leo_nb_atob = float(split[3])
-        mlogp_m_atob = float(split[4])
+        mlogp_m_atob = float(split[5])
         line = file.readline()
 
         # we found tf mutation
@@ -623,6 +623,9 @@ def interpret_causality_summary(filename, bicluster_prefix):
 
                 mutation_name = "{}_{}".format(mutation[0], mutation[1])
                 bicluster_name = "{}_{}".format(used_bicluster_prefix, bicluster)
+
+                if mutation_name not in sif_mutation_to_regulators:
+                    continue
 
                 if bicluster_name not in biclusters:
                     continue

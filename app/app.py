@@ -164,92 +164,40 @@ def phyper(x, M, n, bigN, lower_tail=False):
     """uses scipy.stats to compute hypergeometric overlap p-value"""
     return 1 - stats.hypergeom.cdf(float(x), float(M), float(n), float(bigN))
 
-
-def submat_data(submat, col_indexes):
-    """given a sub matrix and a list of column indexes
-    that specify the columns, of the matrix, return a list
-    of (col_idx, median, min, max, lower_quartile, upper_quartile)
-    tuples
-    """
-    col_medians = np.median(submat, axis=0)
-    col_mins = np.min(submat, axis=0)
-    col_maxs = np.max(submat, axis=0)
-    col_upper_quarts = np.percentile(submat, q=75.0, axis=0)
-    col_lower_quarts = np.percentile(submat, q=25.0, axis=0)
-    data = [[idx,
-             col_mins[i],
-             col_lower_quarts[i],
-             col_medians[i],
-             col_upper_quarts[i],
-             col_maxs[i]
-             ]
-            for i, idx in enumerate(col_indexes)]
-    return sorted(data, key=lambda x: x[3])
-
 # rewritten function, works to the best of my knowledge
 def cluster_data(cursor, cluster_id):
-    cursor.execute("""SELECT g.entrez from bic_gene bg
-        JOIN gene g ON bg.gene_id=g.id WHERE bicluster_id=%s""", [cluster_id])
-    genes = [row[0] for row in cursor.fetchall()]
-    gene_count = len(genes)
-    genes_string = "(%s)" % ','.join(map(lambda p: '%s' % p, genes))
-
-    # get patients based on the given bicluster id
-    cursor.execute("""SELECT name FROM bic_pat bp
-        JOIN patient p ON bp.patient_id=p.id WHERE bicluster_id=%s""",
-        [cluster_id])
-    included_patients = [row[0] for row in cursor.fetchall()]
-    included_patients_string = "(%s)" % ','.join(map(lambda p: '\'%s\'' % p, included_patients))
-
-    # get excluded patients based on the given bicluster id
-    cursor.execute("""SELECT name FROM patient WHERE id NOT IN
-        (SELECT patient_id FROM bic_pat WHERE bicluster_id=%s)""",
-        [cluster_id])
-    excluded_patients = [row[0] for row in cursor.fetchall()]
-    excluded_patients_string = "(%s)" % ','.join(map(lambda p: '\'%s\'' % p, excluded_patients))
-
-    all_patients_string = "(%s)" % ",".join(map(lambda p: '\'%s\'' % p, included_patients + excluded_patients))
     cursor.execute(
-        """SELECT value FROM gene_expression ge
+        """SELECT value, p.name FROM gene_expression ge
         JOIN gene g ON ge.gene_id=g.id
         JOIN patient p ON ge.patient_id=p.id
         WHERE g.entrez IN (
             SELECT g.entrez from bic_gene bg
             JOIN gene g ON bg.gene_id=g.id WHERE bicluster_id=%s
-        )
-        AND p.name IN """ + all_patients_string + """;""",
+        );""",
         [cluster_id]
     )
-    result = [row[0] for row in cursor.fetchall()]
-    submat = np.ndarray((gene_count, len(included_patients + excluded_patients)), dtype=float, buffer=np.array(result), offset=0, strides=None, order=None) # we want a submatrix (whatever that is) of all the different gene expression values we found
-    data = submat_data(submat, included_patients + excluded_patients) # throw the submatrix at this function, does statistics on the data
-
-    return data
+    results = cursor.fetchall()
+    grouped_by_patient = {}
+    for value, patient in results:
+        if patient not in grouped_by_patient:
+            grouped_by_patient[patient] = []    
+        grouped_by_patient[patient].append(value)
+    
+    data = []
+    for patient in grouped_by_patient:
+        gene_expressions = grouped_by_patient[patient]
+        data.append([
+            patient,
+            np.min(gene_expressions), # minimum
+            np.percentile(gene_expressions, q=25.0), # lower quartile
+            np.median(gene_expressions), # median
+            np.percentile(gene_expressions, q=75.0), # upper quartile
+            np.max(gene_expressions), # maximum
+        ])
+    return sorted(data, key=lambda x: x[3])
 
 
 def subtype_enrichment(cursor, cluster_id, phenotype_name, phenotype_min_max):
-    cursor.execute("""SELECT g.entrez from bic_gene bg
-        JOIN gene g ON bg.gene_id=g.id WHERE bicluster_id=%s""", [cluster_id])
-    genes = [row[0] for row in cursor.fetchall()]
-    gene_count = len(genes)
-    genes_string = "(%s)" % ','.join(map(lambda p: '%s' % p, genes))
-
-    # get patients based on the given bicluster id
-    cursor.execute("""SELECT name FROM bic_pat bp
-        JOIN patient p ON bp.patient_id=p.id WHERE bicluster_id=%s""",
-        [cluster_id])
-    included_patients = [row[0] for row in cursor.fetchall()]
-    included_patients_string = "(%s)" % ','.join(map(lambda p: '\'%s\'' % p, included_patients))
-
-    # get excluded patients based on the given bicluster id
-    cursor.execute("""SELECT name FROM patient WHERE id NOT IN
-        (SELECT patient_id FROM bic_pat WHERE bicluster_id=%s)""",
-        [cluster_id]
-    )
-    excluded_patients = [row[0] for row in cursor.fetchall()]
-    excluded_patients_string = "(%s)" % ','.join(map(lambda p: '\'%s\'' % p, excluded_patients))
-
-    # above is exactly like boxplot
     # now make a phenotype map
     cursor.execute("""SELECT p.name, pd.phenotype_string, pd.phenotype_value FROM pheno_data pd
         JOIN patient p ON pd.patient_id=p.id
@@ -271,44 +219,8 @@ def subtype_enrichment(cursor, cluster_id, phenotype_name, phenotype_min_max):
         for i in range(0, 5):
             phenotypes.append((step * i + phenotype_min_max[0], step * (i + 1) + phenotype_min_max[0]))
 
-    # we use the submat_data function to sort our patients
-    # lol part 1. also, i hate this sql statement. despite the obvious injection risk, this is fine. genes_string and included_patients_string is generated from an unexploitable source
-    cursor.execute(
-        """SELECT value FROM gene_expression ge
-        JOIN gene g ON ge.gene_id=g.id
-        JOIN patient p ON ge.patient_id=p.id
-        WHERE g.entrez IN (
-            SELECT g.entrez from bic_gene bg
-            JOIN gene g ON bg.gene_id=g.id WHERE bicluster_id=%s
-        )
-        AND p.name IN""" + included_patients_string + """;""",
-        [cluster_id]
-    )
-    included_patients_result = [row[0] for row in cursor.fetchall()]
-    in_submat = np.ndarray((gene_count, len(included_patients)), dtype=float, buffer=np.array(included_patients_result), offset=0, strides=None, order=None) # we want a submatrix (whatever that is) of all the different gene expression values we found
-    in_data = submat_data(in_submat, included_patients) # throw the submatrix at this function, does statistics on the data
-    sorted_in_names = [row[0] for row in in_data] # NOTE: due to my changes to account for the gene_expression table, row[0] is now a PATIENT NAME, not a PATIENT INDEX.
-
-    # lol part 2. also, i hate this sql statement. despite the obvious injection risk, this is fine. genes_string and excluded_patients_string is generated from an unexploitable source
-    # TODO optimize sql
-    cursor.execute(
-        """SELECT value FROM gene_expression ge
-        JOIN gene g ON ge.gene_id=g.id
-        JOIN patient p ON ge.patient_id=p.id
-        WHERE g.entrez IN (
-            SELECT g.entrez from bic_gene bg
-            JOIN gene g ON bg.gene_id=g.id WHERE bicluster_id=%s
-        )
-        AND p.name IN """ + excluded_patients_string + """;""",
-        [cluster_id]
-    )
-    excluded_patients_result = [row[0] for row in cursor.fetchall()]
-    ex_submat = np.ndarray((gene_count, len(excluded_patients)), dtype=float, buffer=np.array(excluded_patients_result), offset=0, strides=None, order=None) # we want a submatrix (whatever that is) of all the different gene expression values we found 
-    ex_data = submat_data(ex_submat, excluded_patients)    
-    sorted_ex_names = [row[0] for row in ex_data] # NOTE: due to my changes to account for the gene_expression table, row[0] is now a PATIENT NAME, not a PATIENT INDEX.
-
     # sorted by median pValue
-    sorted_patient_names = sorted_in_names + sorted_ex_names
+    sorted_patient_names = [row[0] for row in cluster_data(cursor, cluster_id)]
 
     # group patients into phenotype groups.
     # NOTE: the ptmap items need to be sorted, otherwise groupby fails to group correctly
