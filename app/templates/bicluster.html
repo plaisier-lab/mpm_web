@@ -289,98 +289,102 @@
 				request.responseType = "text"
 				
 				request.onload = (event) => {
-          try {
-            let json = JSON.parse(request.response)
-          
-            $('#boxplot-graph').highcharts({
-              chart: {
-                type: 'boxplot'
-              },
-              legend: {
-                enabled: true
-              },
-              title: {
-                text: ''
-              },
-              xAxis: {
-                plotLines: [
-                  {
-                    value: json.boxplotQuintiles[0],
-                    color: 'lightGray', dashStyle: 'shortdash',
-                    width: 1, zIndex: 3,
-                    label: {
-                      text: '20%', 
-                      style: {
-                        color: 'lightGray',
-                        fontSize: '8pt'
-                      }
-                    }
-                  }, {
-                    value: json.boxplotQuintiles[1],
-                    color: 'lightGray', dashStyle: 'shortdash',
-                    width: 1, zIndex: 3,
-                    label: {
-                      text: '40%',
-                      style: {
-                        color: 'lightGray',
-                        fontSize: '8pt'
-                      }
-                    }
-                  }, {
-                    value: json.boxplotQuintiles[2],
-                    color: 'lightGray', dashStyle: 'shortdash',
-                    width: 1, zIndex: 3,
-                    label: {
-                      text: '60%',
-                      style: {
-                        color: 'lightGray',
-                        fontSize: '8pt'
-                      }
-                    }
-                  }, {
-                    value: json.boxplotQuintiles[3],
-                    color: 'lightGray', dashStyle: 'shortdash',
-                    width: 1, zIndex: 3,
-                    label: {
-                      text: '80%',
-                      style: {
-                        color: 'lightGray',
-                        fontSize: '8pt'
-                      }
-                    }
-                  }
-                ]
-              },
-              yAxis: {
-                title: {text: 'Relative Expression'},
-                plotLines: [{
-                  value: json.boxplotRatiosMean,
-                  color: 'green',
-                  dashStyle: 'shortdash',
-                  width: 1,
-                  zIndex: 3,
+          let json = JSON.parse(request.response)
+        
+          $('#boxplot-graph').highcharts({
+            chart: {
+              type: 'boxplot'
+            },
+            legend: {
+              enabled: true
+            },
+            title: {
+              text: ''
+            },
+            xAxis: {
+              plotLines: [
+                {
+                  value: json.boxplotQuintiles[0],
+                  color: 'lightGray', dashStyle: 'shortdash',
+                  width: 1, zIndex: 3,
                   label: {
-                    text: 'mean',
+                    text: '20%', 
                     style: {
-                      color: 'gray',
+                      color: 'lightGray',
                       fontSize: '8pt'
                     }
                   }
-                }]
-              },
-              series: [
-                {
-                  name: 'All',
-                  showInLegend: false,
-                  colorByPoint: true,
-                  data: json.boxplotData,
-                  colors: json.boxplotColors,
-                  fillColors: json.boxplotColors,
-                },
-                ...json.boxplotLegend
+                }, {
+                  value: json.boxplotQuintiles[1],
+                  color: 'lightGray', dashStyle: 'shortdash',
+                  width: 1, zIndex: 3,
+                  label: {
+                    text: '40%',
+                    style: {
+                      color: 'lightGray',
+                      fontSize: '8pt'
+                    }
+                  }
+                }, {
+                  value: json.boxplotQuintiles[2],
+                  color: 'lightGray', dashStyle: 'shortdash',
+                  width: 1, zIndex: 3,
+                  label: {
+                    text: '60%',
+                    style: {
+                      color: 'lightGray',
+                      fontSize: '8pt'
+                    }
+                  }
+                }, {
+                  value: json.boxplotQuintiles[3],
+                  color: 'lightGray', dashStyle: 'shortdash',
+                  width: 1, zIndex: 3,
+                  label: {
+                    text: '80%',
+                    style: {
+                      color: 'lightGray',
+                      fontSize: '8pt'
+                    }
+                  }
+                }
               ]
-            });
+            },
+            yAxis: {
+              title: {text: 'Relative Expression'},
+              plotLines: [{
+                value: json.boxplotRatiosMean,
+                color: 'green',
+                dashStyle: 'shortdash',
+                width: 1,
+                zIndex: 3,
+                label: {
+                  text: 'mean',
+                  style: {
+                    color: 'gray',
+                    fontSize: '8pt'
+                  }
+                }
+              }]
+            },
+            series: [
+              {
+                name: 'All',
+                showInLegend: false,
+                colorByPoint: true,
+                data: json.boxplotData,
+                colors: json.boxplotColors,
+                fillColors: json.boxplotColors,
+              },
+              ...json.boxplotLegend
+            ]
+          });
 
+          // display enrichment quintiles if we have the data available
+          if(json.enrichmentQuintiles) {
+            document.getElementById("enrichment-scatterplot-stats").innerHTML = ""
+            document.getElementById("enrichment-header").innerHTML = "Enrichment of Phenotypes in Qunitiles"
+            document.getElementById("enrich").innerHTML = "Patient phenotypes are sorted as on the left and broken into quintiles following the dashed grey lines. Then each quintile is tested for enrichment of each phenotype. The deviation from zero indicate -log10(enrichment p-value), and positive values indicate over-enrichment and negative values underenrichment."
             $('#enrichment-graph').highcharts({
               chart: {
                 type: 'column',
@@ -396,7 +400,7 @@
                 },
                 plotLines: [
                   {
-                    value: json.enrichmentQuintiles[0],
+                    value: json.enrichmentQuintiles.quintiles[0],
                     color: 'lightGray', dashStyle: 'shortdash',
                     width: 1, zIndex: 3,
                     label: {
@@ -407,7 +411,7 @@
                       }
                     }
                   }, {
-                    value: json.enrichmentQuintiles[1],
+                    value: json.enrichmentQuintiles.quintiles[1],
                     color: 'lightGray', dashStyle: 'shortdash',
                     width: 1, zIndex: 3,
                     label: {
@@ -418,7 +422,7 @@
                       }
                     }
                   }, {
-                    value: json.enrichmentQuintiles[2],
+                    value: json.enrichmentQuintiles.quintiles[2],
                     color: 'lightGray', dashStyle: 'shortdash',
                     width: 1, zIndex: 3,
                     label: {
@@ -429,7 +433,7 @@
                       }
                     }
                   }, {
-                    value: json.enrichmentQuintiles[3],
+                    value: json.enrichmentQuintiles.quintiles[3],
                     color: 'lightGray', dashStyle: 'shortdash',
                     width: 1, zIndex: 3,
                     label: {
@@ -446,16 +450,16 @@
                 title: {
                   text: 'Enrichment of Subtypes in Quintiles'
                 },
-                max: json.maxEnrichmentPValue,
-                min: json.minEnrichmentPValue,
+                max: json.enrichmentQuintiles.maxPValue,
+                min: json.enrichmentQuintiles.minPValue,
                 plotLines: [{
-                  value: json.enrichmentUpper,
+                  value: json.enrichmentQuintiles.upper,
                   color: 'red',
                   dashStyle: 'shortdash',
                   width: 1,
                   zIndex: 3,
                 }, {
-                  value: json.enrichmentLower,
+                  value: json.enrichmentQuintiles.lower,
                   color: 'red',
                   dashStyle: 'shortdash',
                   width: 1,
@@ -464,15 +468,61 @@
               },
               series: [{
                 name: 'All',
-                data: json.enrichmentData,
+                data: json.enrichmentQuintiles.data,
                 showInLegend: false,
                 colorByPoint: true,
-                colors: json.enrichmentColors,
+                colors: json.enrichmentQuintiles.colors,
               }]
             });
           }
-          catch {
-
+          else {
+            document.getElementById("enrichment-scatterplot-stats").innerHTML = `R = ${json.enrichmentScatter.scatter.stats[0].toPrecision(3)}, p = ${json.enrichmentScatter.scatter.stats[1].toExponential(2)}`
+            document.getElementById("enrichment-header").innerHTML = "Phenotypes in Scatterplot"
+            document.getElementById("enrich").innerHTML = "Patients are displayed in scatterplot, with x values corresponding to median bicluster gene expression and y values corresponding to phenotype values."
+            $('#enrichment-graph').highcharts({
+              tooltip: {
+                formatter: function () {
+                  return `<b>${this.key}</b><br>${json.enrichmentScatter.biclusterName}: ${this.x}<br>${json.enrichmentScatter.phenotypeName}: ${this.y}<br>`
+                }
+              },
+              chart: {
+                type: 'scatter'
+              },
+              legend: {
+                enabled: false,
+              },
+              title: {
+                text: ''
+              },
+              xAxis: {
+                title: {
+                  text: json.enrichmentScatter.biclusterName,
+                },
+              },
+              yAxis: {
+                title: {
+                  text: json.enrichmentScatter.phenotypeName,
+                },
+              },
+              series: [
+                json.enrichmentScatter.scatter.data,
+                {
+                  type: 'line',
+                  name: 'Regression Line',
+                  data: json.enrichmentScatter.scatter.regression,
+                  marker: {
+                    enabled: false
+                  },
+                  states: {
+                    hover: {
+                      lineWidth: 0
+                    }
+                  },
+                  enableMouseTracking: false,
+                  color: "#FF0000"
+                },
+              ]
+            });
           }
         }
 
@@ -563,21 +613,22 @@
             <tr>
               <td width='60%' align='center'>
                 <span data-toggle='collapse' data-target='#tumorExp'>
-                  <b>Bicluster Expression of Patient Tumors</b>
+                  <b>Bicluster Expression of Phenotype</b>
                 </span>
                 <span class="glyphicon glyphicon-info-sign" data-toggle='collapse' data-target='#tumorExp' style='color:#f00;'></span>
                 <div id='tumorExp' class='collapse' style='text-align:justify;'>
-                  Expression of genes from patient tumors in bicluster on left side of red dashed line and out of bicluster on right of red dashed line. Each patient tumor is represented as a boxplot, ordered by their median expression for the bicluster genes (smallest to largest) and colored according to it's GBM subtype.
+                  Expression of genes in bicluster from the selected patient phenotype on left side of red dashed line and out of bicluster on right of red dashed line. Each patient is represented as a boxplot, ordered by their median expression for the bicluster genes (smallest to largest) and colored according to it's phenotype value.
                 </div>
               </td>
               <td width='40%' align='center'>
                 <span data-toggle='collapse' data-target='#enrich'>
-                  <b>Enrichment of Tumor Subtypes in Qunitiles</b>
+                  <b id="enrichment-header">Enrichment of Phenotypes in Qunitiles</b>
                 </span>
                 <span class="glyphicon glyphicon-info-sign" data-toggle='collapse' data-target='#enrich' style='color:#f00;)'></span>
                 <div id='enrich' class='collapse' style='text-align:justify;'>
-                  Patient tumors are sorted as on the left and broken into quintiles following the dashed grey lines. Then each quintile is tested for enrichment of each tumor subtype. The deviation from zero indicate -log10(enrichment p-value), and positive values indicate over-enrichment and negative values underenrichment.
+                  Patient phenotypes are sorted as on the left and broken into quintiles following the dashed grey lines. Then each quintile is tested for enrichment of each phenotype. The deviation from zero indicate -log10(enrichment p-value), and positive values indicate over-enrichment and negative values underenrichment.
                 </div>
+                <b id="enrichment-scatterplot-stats" style="display: block;"></b>
               </td>
             </tr>
           </table>

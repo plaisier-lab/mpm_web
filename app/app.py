@@ -135,10 +135,29 @@ GRAPH_COLOR_MAP = {
 GRAPH_COLOR_GRADIENTS = {
     'age_at_surgery': ('#333333', '#2cd46d'),
     'survival': ('#333333', '#2cd46d'),
+    'preop_treatment': ('#333333', '#2cd46d'),
+    'B.cells.naive': ('#333333', '#2cd46d'),
+    'B.cells.memory': ('#333333', '#2cd46d'),
+    'Plasma.cells': ('#333333', '#2cd46d'),
+    'T.cells.CD8': ('#333333', '#2cd46d'),
+    'T.cells.CD4.naive': ('#333333', '#2cd46d'),
+    'T.cells.CD4.memory.resting': ('#333333', '#2cd46d'),
+    'T.cells.CD4.memory.activated': ('#333333', '#2cd46d'),
+    'T.cells.follicular.helper': ('#333333', '#2cd46d'),
+    'T.cells.regulatory..Tregs.': ('#333333', '#2cd46d'),
+    'T.cells.gamma.delta': ('#333333', '#2cd46d'),
+    'NK.cells.resting': ('#333333', '#2cd46d'),
+    'NK.cells.activated': ('#333333', '#2cd46d'),
     'Monocytes': ('#333333', '#2cd46d'),
+    'Macrophages.M0': ('#333333', '#2cd46d'),
+    'Macrophages.M1': ('#333333', '#2cd46d'),
+    'Macrophages.M2': ('#333333', '#2cd46d'),
+    'Dendritic.cells.resting': ('#333333', '#2cd46d'),
+    'Dendritic.cells.activated': ('#333333', '#2cd46d'),
+    'Mast.cells.resting': ('#333333', '#2cd46d'),
+    'Mast.cells.activated': ('#333333', '#2cd46d'),
     'Eosinophils': ('#333333', '#2cd46d'),
     'Neutrophils': ('#333333', '#2cd46d'),
-    'Plasma.cells': ('#333333', '#2cd46d'),
 }
 
 SELECTABLE_PHENOTYPES = [
@@ -146,11 +165,32 @@ SELECTABLE_PHENOTYPES = [
     ("Patient Sex", "sex"),
     ("Age At Surgery", "age_at_surgery"),
     ("Survival", "survival"),
+    ("Preop Treatment", "preop_treatment"),
+    ("B-Cells Naive", "B.cells.naive"),
+    ("B-Cells Memory", "B.cells.memory"),
+    ("Plasma Cells", "Plasma.cells"),
+    ("T-Cells CD8", "T.cells.CD8"),
+    ("T-Cells CD4 Naive", "T.cells.CD4.naive"),
+    ("T-Cells CD4 Memory Resting", "T.cells.CD4.memory.resting"),
+    ("T-Cells CD4 Memory Activated", "T.cells.CD4.memory.activated"),
+    ("T-Cells Follicular Helper", "T.cells.follicular.helper"),
+    ("T-Cells Regulatory TRegs", "T.cells.regulatory..Tregs."),
+    ("T-Cells Gamma Delta", "T.cells.gamma.delta"),
+    ("NK-Cells Resting", "NK.cells.resting"),
+    ("NK-Cells Activated", "NK.cells.activated"),
     ("Monocytes", "Monocytes"),
+    ("Macrophages M0", "Macrophages.M0"),
+    ("Macrophages M1", "Macrophages.M1"),
+    ("Macrophages M2", "Macrophages.M2"),
+    ("Dendritic Cells Resting", "Dendritic.cells.resting"),
+    ("Dendritic Cells Activated", "Dendritic.cells.activated"),
+    ("Mast Cells Resting", "Mast.cells.resting"),
+    ("Mast Cells Activated", "Mast.cells.activated"),
     ("Eosinophils", "Eosinophils"),
     ("Neutrophils", "Neutrophils"),
-    ("Plasma Cells", "Plasma.cells"),
 ]
+
+USE_PHENOTYPE_SCATTERPLOT = True
 
 PHENOTYPE_INDEX_TO_UINAME = {item[1]: item[0] for item in SELECTABLE_PHENOTYPES}
 
@@ -656,32 +696,7 @@ def bicluster_expression_graph(bicluster=None, phenotype_name="histology_WHO"):
 
     # Prepare graph plotting data
     all_boxplot_data = cluster_data(c, bc_pk)
-    enrichment_pvalues, min_enrichment_pvalue, max_enrichment_pvalue = subtype_enrichment(c, bc_pk, phenotype_name, phenotype_min_max)
-    js_enrichment_data = []
-    js_enrichment_colors = []
 
-    for part in enrichment_pvalues:
-        if phenotype_min_max == None:
-            for phenotype in PHENOTYPES_DICT[phenotype_name]:
-                js_enrichment_data.append([phenotype, part[phenotype]])
-                js_enrichment_colors.append(GRAPH_COLOR_MAP[phenotype])
-        else:
-            index = 1
-            for key in part.keys():
-                key_range = "[" + "{:.2f}".format(key[0]) + "," + "{:.2f}".format(key[1]) + ")"
-                if index == 5:
-                    key_range = "[" + "{:.2f}".format(key[0]) + "," + "{:.2f}".format(key[1]) + "]"
-                
-                js_enrichment_data.append(["Phenotype Quintile " + str(index) + ": " + key_range, part[key]])
-                js_enrichment_colors.append(get_phenotype_color(phenotype_name, key[0], phenotype_min_max))
-                index = index + 1
-
-    enrichment_upper = -math.log10(0.05/30.0)
-    enrichment_lower = math.log10(0.05/30.0)
-    enrich_perc20 = len(js_enrichment_data) / 5
-    enrich_quintiles = [enrich_perc20 * i - 0.5 for i in range(1, 6)]
-
-    ratios_mean = 8.167528228975065 # TODO: have some way to precompute the mean for all the 4.5 million gene_expression cells
     patients = [item[0] for item in all_boxplot_data]
 
     c.execute("SELECT p.name, pd.phenotype_string, pd.phenotype_value FROM patient p"
@@ -693,6 +708,97 @@ def bicluster_expression_graph(bicluster=None, phenotype_name="histology_WHO"):
     values = c.fetchall()
     string_ptmap = {patient: phenotype for patient, phenotype, _ in values}
     value_ptmap = {patient: value for patient, _, value in values}
+
+    js_enrichment_quintiles = None
+    js_enrichment_scatter = None
+    if USE_PHENOTYPE_SCATTERPLOT == False or phenotype_min_max == None:
+        enrichment_pvalues, min_enrichment_pvalue, max_enrichment_pvalue = subtype_enrichment(c, bc_pk, phenotype_name, phenotype_min_max)
+        enrichment_data = []
+        enrichment_colors = []
+
+        for part in enrichment_pvalues:
+            if phenotype_min_max == None:
+                for phenotype in PHENOTYPES_DICT[phenotype_name]:
+                    enrichment_data.append([phenotype, part[phenotype]])
+                    enrichment_colors.append(GRAPH_COLOR_MAP[phenotype])
+            else:
+                index = 1
+                for key in part.keys():
+                    key_range = "[" + "{:.2f}".format(key[0]) + "," + "{:.2f}".format(key[1]) + ")"
+                    if index == 5:
+                        key_range = "[" + "{:.2f}".format(key[0]) + "," + "{:.2f}".format(key[1]) + "]"
+                    
+                    enrichment_data.append(["Phenotype Quintile " + str(index) + ": " + key_range, part[key]])
+                    enrichment_colors.append(get_phenotype_color(phenotype_name, key[0], phenotype_min_max))
+                    index = index + 1
+
+        enrichment_upper = -math.log10(0.05/30.0)
+        enrichment_lower = math.log10(0.05/30.0)
+        enrich_perc20 = len(enrichment_data) / 5
+        enrich_quintiles = [enrich_perc20 * i - 0.5 for i in range(1, 6)]
+
+        js_enrichment_quintiles = {
+            "quintiles": enrich_quintiles,
+            "maxPValue": max_enrichment_pvalue,
+            "minPValue": min_enrichment_pvalue,
+            "upper": enrichment_upper,
+            "lower": enrichment_lower,
+            "data": enrichment_data,
+            "colors": enrichment_colors,
+        }
+    else:
+        js_scatterplot = {
+            "name": "Values",
+            "data": [],
+            "color": GRAPH_COLOR_GRADIENTS[phenotype_name][1],
+            "marker": {
+                "symbol": "circle",
+                "radius": 3,
+            },
+        }
+
+        all_data = []
+        highest_x = -10000
+        lowest_x = 10000
+        for i, item in enumerate(all_boxplot_data):
+            x = item[3] # get the median
+            y = value_ptmap[patients[i]]
+            
+            js_scatterplot["data"].append({
+                "x": x,
+                "y": y,
+                "name": patients[i],
+                "color": get_phenotype_color(phenotype_name, y, phenotype_min_max),
+            })
+
+            all_data.append([x, y])
+
+            if x < lowest_x:
+                lowest_x = x
+            
+            if x > highest_x:
+                highest_x = x
+
+        flattened_x = [i[0] for i in all_data]
+        flattened_y = [i[1] for i in all_data]
+
+        js_scatterplot_stats = stats.pearsonr(flattened_x, flattened_y)
+        regression = LinearRegression().fit([(i[0],) for i in all_data], flattened_y)
+            
+        js_enrichment_scatter = {
+            "biclusterName": "{} Median Expression".format(bicluster),
+            "phenotypeName": "{} Value".format(PHENOTYPE_INDEX_TO_UINAME[phenotype_name]),
+            "scatter": {
+                "data": js_scatterplot,
+                "stats": js_scatterplot_stats,
+                "regression": [
+                    [lowest_x, regression.coef_[0] * lowest_x + regression.intercept_],
+                    [highest_x, regression.coef_[0] * highest_x + regression.intercept_]
+                ]
+            },
+        }
+
+    ratios_mean = 8.167528228975065 # TODO: have some way to precompute the mean for all the 4.5 million gene_expression cells
 
     js_boxplot_colors = []
     js_boxplot_legend = []
@@ -747,13 +853,8 @@ def bicluster_expression_graph(bicluster=None, phenotype_name="histology_WHO"):
         "boxplotColors": js_boxplot_colors,
         "boxplotRatiosMean": ratios_mean,
         "boxplotQuintiles": quintiles,
-        "enrichmentQuintiles": enrich_quintiles,
-        "maxEnrichmentPValue": max_enrichment_pvalue,
-        "minEnrichmentPValue": min_enrichment_pvalue,
-        "enrichmentUpper": enrichment_upper,
-        "enrichmentLower": enrichment_lower,
-        "enrichmentData": js_enrichment_data,
-        "enrichmentColors": js_enrichment_colors,
+        "enrichmentQuintiles": js_enrichment_quintiles,
+        "enrichmentScatter": js_enrichment_scatter,
     })
 
 @app.route('/bicluster/<bicluster>')
@@ -938,12 +1039,23 @@ WHERE bh.bicluster_id=%s""", [bc_pk])
         hallmark_image_class[hallmark_to_image[hm_name]] = ""
 
     # GO
-    c.execute("""SELECT go_bp.id, go_bp.go_id, go_bp.name FROM bic_go join go_bp on go_bp.id=bic_go.go_bp_id
-WHERE bic_go.bicluster_id=%s""", [bc_pk])
+    c.execute(
+        """SELECT go_bp.id, go_bp.go_id, go_bp.name FROM bic_go
+        JOIN go_bp ON go_bp.id = bic_go.go_bp_id
+        WHERE bic_go.bicluster_id = %s""",
+        [bc_pk]
+    )
     tmps = list(c.fetchall())
     gobps = []
     for gobp in tmps:
-        c.execute("""SELECT distinct gene.symbol FROM go_gene, gene, bic_gene WHERE go_gene.go_bp_id=%s AND bic_gene.bicluster_id=%s AND go_gene.gene_id=gene.id AND gene.id=bic_gene.gene_id order by gene.symbol""", [gobp[0], bc_pk])
+        c.execute(
+            """SELECT DISTINCT gene.symbol FROM go_gene, gene, bic_gene
+            WHERE go_gene.go_bp_id = %s AND bic_gene.bicluster_id = %s
+            AND go_gene.gene_id = gene.id
+            AND gene.id = bic_gene.gene_id
+            ORDER BY gene.symbol""",
+            [gobp[0], bc_pk]
+        )
         gobps.append(list(gobp) + [[row[0] for row in c.fetchall()]])
 
     db.close()
