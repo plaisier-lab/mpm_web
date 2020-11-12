@@ -528,61 +528,152 @@
 
         request.send()
       }
+
+      let regulatorTimeout
+      let loadRegulatorsDebounced = (rValueCutoff) => {
+        if(!isNaN(parseFloat(rValueCutoff))) {
+          rValueCutoff = parseFloat(rValueCutoff)
+
+          clearTimeout(regulatorTimeout)
+          regulatorTimeout = setTimeout(() => {
+            loadRegulators(rValueCutoff)
+          }, 100)
+        }
+      }
+
+      function loadRegulators(rValueCutoff) {
+        let request = new XMLHttpRequest()
+				request.open("GET", `/bicluster/{{bicluster}}/info?r_cutoff=${rValueCutoff}`, true)
+				request.responseType = "text"
+				
+				request.onload = (event) => {
+          let json = JSON.parse(request.response)
+          let graphElements = json.cytoscape
+
+          document.getElementById("regulators-table").innerHTML = ""
+          for(let regulator of json.regulators) {
+            let action = regulator[3] == "Repressor"
+              ? `<div style='font-weight: bold; color:#990000'>${regulator[3]}</div>`
+              : `<div style='font-weight: bold; color:#009900'>${regulator[3]}</div>`
+            
+            document.getElementById("regulators-table").innerHTML += `
+              <td>${regulator[0]}</td>
+              <td><a href='/search?gene=${regulator[2]}'>${regulator[2]}</a></td>
+              <td>${action}</td>
+              <td>${regulator[4]}</td>
+              <td>${regulator[5] || "N/A"}</td>
+              <td>${regulator[6] || "N/A"}</td>
+            `
+          }
+
+          var cy = cytoscape({
+            container: $('#regulation-graph'),
+            elements: graphElements,
+            style: [{
+              selector: 'edge',
+              style: {
+                'width': 3,
+                'line-color': '#000',
+                'opacity': 0.2,
+                'target-arrow-color': '#000',
+                'target-arrow-shape': 'triangle'
+              }
+            }, {
+              selector: '.repressor',
+              style: {
+                'width': 3,
+                'line-color': '#f00',
+                'opacity': 0.3,
+                'target-arrow-color': '#f00',
+                'target-arrow-shape': 'tee'
+              }
+            }, {
+              selector: '.activator',
+              style: {
+                'width': 3,
+                'line-color': '#0f0',
+                'opacity': 0.3,
+                'target-arrow-color': '#0f0',
+                'target-arrow-shape': 'triangle'
+              }
+            }, {
+              selector: '.genotype',
+              style: {
+                'background-color': '#d0d',
+                'label': 'data(name)',
+                'shape': 'polygon',
+                'shape-polygon-points': '-1 -1 0 -0.45 1 -1 0 1'
+              }
+            }, {
+              selector: '.tf',
+              style: {
+                'background-color': '#f00',
+                'label': 'data(name)',
+                'shape': 'triangle'
+              }
+            }, {
+              selector: '.mirna',
+              style: {
+                'background-color': '#ec5',
+                'label': 'data(name)',
+                'shape': 'diamond'
+              }
+            }, {
+              selector: '.bicluster',
+              style: {
+                'background-color': '#aaa',
+                'label': 'data(name)',
+                'shape': 'square'
+              }
+            }, {
+              selector: '.hallmark',
+              style: {
+                'background-color': '#0f0',
+                'label': 'data(name)',
+                'shape': 'rhomboid'
+              }
+            }],
+            layout: {
+              name: 'dagre'
+            }
+          });
+          cy.resize();
+        }
+
+        request.send()
+      }
       
       $(document).ready(function() {
         $('#gobps').DataTable( {
-            columnDefs: [
-                {type: 'non-empty-string', targets: 2}
-            ],                
-            "order": [[2, "asc"]]
+          columnDefs: [
+            {type: 'non-empty-string', targets: 2}
+          ],                
+          "order": [[2, "asc"]]
         });
-        var shiftWindow = function() { scrollBy(0, -50) };
+        var shiftWindow = function() {
+          scrollBy(0, -50)
+        };
         window.addEventListener("hashchange", shiftWindow);
-        function load() { if (window.location.hash) shiftWindow(); }
+        function load() {
+          if (window.location.hash) {
+            shiftWindow();
+          }
+        }
 
-        var graphElements = {{elements|safe}};
+        loadRegulators(0)
 
-        var cy = cytoscape({
-          container: $('#regulation-graph'),
-          elements: graphElements,
+        let handleRValueInput = (event) => {
+          document.getElementById("rvalue-cutoff-range").value = event.target.value
+          document.getElementById("rvalue-cutoff-range-clone").value = event.target.value
+          document.getElementById("rvalue-cutoff-input").value = event.target.value
+          document.getElementById("rvalue-cutoff-input-clone").value = event.target.value
+          loadRegulatorsDebounced(event.target.value)
+        }
 
-          style: [
-            {
-              selector: 'edge',
-              style: { 'width': 3, 'line-color': '#000', 'opacity': 0.2, 'target-arrow-color': '#000', 'target-arrow-shape': 'triangle' }
-            },
-            {
-              selector: '.repressor',
-              style: { 'width': 3, 'line-color': '#f00', 'opacity': 0.3, 'target-arrow-color': '#f00', 'target-arrow-shape': 'tee' }
-            },
-            {
-              selector: '.activator',
-              style: { 'width': 3, 'line-color': '#0f0', 'opacity': 0.3, 'target-arrow-color': '#0f0', 'target-arrow-shape': 'triangle' }
-            },
-
-            {
-              selector: '.genotype',
-              style: { 'background-color': '#d0d', 'label': 'data(name)', 'shape': 'polygon', 'shape-polygon-points': '-1 -1 0 -0.45 1 -1 0 1' }
-            },
-            {
-              selector: '.tf',
-              style: { 'background-color': '#f00', 'label': 'data(name)', 'shape': 'triangle' }
-            },
-            {
-              selector: '.mirna',
-              style: { 'background-color': '#ec5', 'label': 'data(name)', 'shape': 'diamond' }
-            },
-            {
-              selector: '.bicluster',
-              style: { 'background-color': '#aaa', 'label': 'data(name)', 'shape': 'square' }
-            },
-            {
-              selector: '.hallmark',
-              style: { 'background-color': '#0f0', 'label': 'data(name)', 'shape': 'rhomboid' }
-            }
-          ], layout: { name: 'dagre'}
-        });
-        cy.resize();
+        document.getElementById("rvalue-cutoff-range").addEventListener("input", handleRValueInput)
+        document.getElementById("rvalue-cutoff-range-clone").addEventListener("input", handleRValueInput)
+        document.getElementById("rvalue-cutoff-input").addEventListener("input", handleRValueInput)
+        document.getElementById("rvalue-cutoff-input-clone").addEventListener("input", handleRValueInput)
       });
     </script>
 {% endblock %}
@@ -591,11 +682,30 @@
     <div>
       <div class='bs-callout bs-callout-success text-center'><h3><strong>{{ bicluster | upper }}</strong></h3></div>
       <div class='bs-callout bs-callout-default'>
-          <h4>Bicluster Network Summary <span class="glyphicon glyphicon-info-sign" data-toggle='collapse' data-target='#bicNet' style='color:#f00;)'></span></h4>
-                    <div id='bicNet' class='collapse' style='text-align:justify;'> <div align='center'><b>Legend:</b><br> <span class="glyphicon glyphicon-stop" style='color:#d0d;'></span> = Somatically mutated gene/pathway</br>
-              <span class="glyphicon glyphicon-stop" style='color:#f00'></span> = TF; <span class="glyphicon glyphicon-stop" style='color:#ec5'></span> = miRNA; (Regulator edges: <span class="glyphicon glyphicon-arrow-up" style='color:#0f0; opacity:0.7;'></span> = Activation; <span style='color:#f00; opacity:0.7;'><b>T</b></span> = Repression)<br> <span class="glyphicon glyphicon-stop" style='color:#aaa'></span> = Bicluster<br> <span class="glyphicon glyphicon-stop" style='color:#0f0'></span> = Hallmark of Cancer</div>
-      </div>
-          <div id="regulation-graph"></div>
+        <h4>Bicluster Network Summary <span class="glyphicon glyphicon-info-sign" data-toggle='collapse' data-target='#bicNet' style='color:#f00;)'></span></h4>
+        <div id='bicNet' class='collapse' style='text-align:justify;'>
+          <div align='center'>
+            <b>Legend:</b>
+            <br>
+            <span class="glyphicon glyphicon-stop" style='color:#d0d;'></span> = Somatically mutated gene/pathway</br>
+            <span class="glyphicon glyphicon-stop" style='color:#f00'></span> = TF;
+            <span class="glyphicon glyphicon-stop" style='color:#ec5'></span> = miRNA; (Regulator edges: <span class="glyphicon glyphicon-arrow-up" style='color:#0f0; opacity:0.7;'></span> = Activation; <span style='color:#f00; opacity:0.7;'><b>T</b></span> = Repression)
+            <br>
+            <span class="glyphicon glyphicon-stop" style='color:#aaa'></span> = Bicluster
+            <br>
+            <span class="glyphicon glyphicon-stop" style='color:#0f0'></span> = Hallmark of Cancer
+          </div>
+        </div>
+        <div id="regulation-graph"></div>
+        <div>
+          <div class="form-group" style="width: 40%; margin: auto;">
+            <label for="formControlRange">Absolute R-Value Cutoff (&gt;= r-values kept)</label>
+            <div style="display: flex;">
+              <input value="0.0" type="text" size="3" style="margin-right: 10px;" id="rvalue-cutoff-input" />
+              <input value="0.0" type="range" min="0" max="1" step="0.1" class="form-control-range" id="rvalue-cutoff-range" />
+            </div>
+          </div>
+        </div>
       </div>
       <div class='bs-callout bs-callout-default'>
         <h4>Summary</h4>
@@ -698,18 +808,29 @@
 
       <div class='bs-callout bs-callout-default' id='regulators'>
         <h4>Regulators</h4>
+        <div>
+          <div class="form-group" style="width: 40%; margin: auto;">
+            <label for="formControlRange">Absolute R-Value Cutoff (&gt;= r-values kept)</label>
+            <div style="display: flex;">
+              <input value="0.0" type="text" size="3" style="margin-right: 10px;" id="rvalue-cutoff-input-clone" />
+              <input value="0.0" type="range" min="0" max="1" step="0.1" class="form-control-range" id="rvalue-cutoff-range-clone" />
+            </div>
+          </div>
+        </div>
         <div class="container-fluid" style="margin-top: 20px;"></div>
         <table class='table table-bordered table-striped text-center'>
-          <tr>
-            <th class='text-center'>Type</th><th class='text-center'>Name</th><th class='text-center'>Action</th><th class='text-center'>Prior Knowledge</th>
-          </tr>
-          {% for reg1 in regulators %}
-          <tr>
-            <td>{{ reg1[0] }}</td><td><a href='/search?gene={{reg1[2]}}'>{{ reg1[2] }}</a></td><td>{% if reg1[3]=='Repressor' %}<div style='font-weight: bold; color:#990000'>{{ reg1[3] }}</div>{% endif %}{% if reg1[3]=='Activator' %}<div style='font-weight: bold; color:#009900'>{{ reg1[3] }}</div>{% endif %}</td><td>{{ reg1[4] }}</td>
-          </tr>
-          {% endfor %}
-          <tr>                                    
-          </tr>
+          <thead>
+            <tr>
+              <th class='text-center'>Type</th>
+              <th class='text-center'>Name</th>
+              <th class='text-center'>Action</th>
+              <th class='text-center'>Prior Knowledge</th>
+              <th class='text-center'>P-Value</th>
+              <th class='text-center'>R-Value</th>
+            </tr>
+          </thead>
+
+          <tbody id="regulators-table"></tbody>
         </table>        
       </div>      
       <div class='bs-callout bs-callout-default' id='causal'>
