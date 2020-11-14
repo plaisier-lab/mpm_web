@@ -134,7 +134,6 @@ GRAPH_COLOR_MAP = {
 
 GRAPH_COLOR_GRADIENTS = {
     'age_at_surgery': ('#333333', '#2cd46d'),
-    'survival': ('#333333', '#2cd46d'),
     'preop_treatment': ('#333333', '#2cd46d'),
     'B.cells.naive': ('#333333', '#2cd46d'),
     'B.cells.memory': ('#333333', '#2cd46d'),
@@ -164,7 +163,6 @@ SELECTABLE_PHENOTYPES = [
     ("WHO Histology", "histology_WHO"),
     ("Patient Sex", "sex"),
     ("Age At Surgery", "age_at_surgery"),
-    ("Survival", "survival"),
     ("Preop Treatment", "preop_treatment"),
     ("B-Cells Naive", "B.cells.naive"),
     ("B-Cells Memory", "B.cells.memory"),
@@ -360,6 +358,151 @@ def get_phenotype_color(phenotype_name, value, min_max):
         return hex + hex[1] + hex[1] + hex[1]
     else:
         return hex
+
+def get_regulator_info(bicluster, r_cutoff):
+    db = dbconn()
+    c = db.cursor()
+    
+    c.execute("SELECT id, name FROM bicluster WHERE name=%s;", [bicluster])
+    bc_pk, bc_name = c.fetchone()
+    
+    # Regulators
+    elements = []
+    elements.append({'data': { 'id': 'bc%d' % bc_pk, 'name': bc_name}, 'classes': 'bicluster' })
+
+    regulators = []
+    c.execute("""SELECT tfr.id, g.symbol, tfr.r_value, tfr.p_value FROM tf_regulator tfr join gene g on tfr.tf_id=g.id WHERE tfr.bicluster_id=%s""", [bc_pk])
+    tfs = list(c.fetchall())
+    tfList = []
+    for tf in tfs:
+        if abs(tf[2]) < r_cutoff:
+            continue
+        
+        known = 'No'
+        '''
+        c.execute("""SELECT * FROM tf_crispr WHERE gene_id=%s""", [tf[0]]) # we will have this table soon
+        for crispr in c.fetchall():
+            if float(crispr[4])<=0.05:
+                known = 'Yes'
+        '''
+
+        tf_action = "Repressor"
+        if tf[2] > 0:
+            tf_action = "Activator"
+
+        regulators.append(['TF', tf[0], tf[1], tf_action, known, "{:.5g}".format(tf[3]), "{:.5g}".format(tf[2])])
+        tfList.append(tf[1])
+        elements.append({'data': { 'id': 'reg%d' % tf[0], 'name': tf[1] }, 'classes': 'tf' })
+        elements.append({'data': { 'id': 'tfbc%d' % tf[0], 'source': 'reg%d' % tf[0], 'target': 'bc%d' % bc_pk }, 'classes': "N/A Action" })
+
+    c.execute("""SELECT mirna.id, mirna.name FROM mirna_regulator mr join mirna on mirna.id=mr.mirna_id WHERE mr.bicluster_id=%s""", [bc_pk])
+    mirnas = list(c.fetchall())
+
+    mirnaList = []
+    for mirna in mirnas:
+        if not mirna[0] in mirnaList:
+            # our known is yes if we can find any mirna's given the mirna sql id
+            known = 'No'
+            c.execute("""SELECT COUNT(*) FROM mirna_prior WHERE mirna_id=%s""", [mirna[0]])
+            mirna_count = c.fetchone()[0]
+            if mirna_count != 0:
+                known = 'Yes'
+            
+            # old code
+            # if (not mirna[2]=='no') or (not mirna[3]==0):
+            #    known = 'Yes'
+            
+            regulators.append(['miRNA', mirna[0], mirna[1], 'Repressor', known])
+            mirnaList.append(mirna[1])
+            elements.append({'data': { 'id': 'reg%d' % mirna[0], 'name': mirna[1]}, 'classes': 'mirna' })
+            elements.append({'data': { 'id': 'mirnabc%d' % mirna[0], 'source': 'reg%d' % mirna[0], 'target': 'bc%d' % bc_pk }, 'classes': 'repressor' })
+
+    regulators = sorted(regulators, key=lambda name: name[1])
+
+    # Get causal flows with bicluster
+    c.execute("""SELECT id,somatic_mutation_id,regulator_id,regulator_type,bicluster_id,leo_nb_atob,mlogp_m_atob
+FROM causal_flow WHERE bicluster_id=%s""", [bc_pk])
+    tmp_cf = c.fetchall()
+    causal_flows = []
+    for cf_pk, cf_som_mut_id, cf_reg_id, cf_reg_type, cf_bc_id, cf_leo, cf_mlogp in tmp_cf:
+        if cf_reg_type == 'tf':
+            c.execute("""SELECT g.symbol FROM tf_regulator tr JOIN gene g ON tr.tf_id = g.id WHERE tr.id=%s""", [cf_reg_id])
+            g1 = c.fetchone()[0]
+        else:
+            c.execute("""SELECT m.name FROM mirna_regulator mr JOIN mirna m ON mr.mirna_id = m.id WHERE mr.id=%s""", [cf_reg_id])
+            g1 = c.fetchone()[0]
+
+        if (cf_reg_type == 'tf' and g1 in tfList) or (cf_reg_type == 'mirna' and g1 in mirnaList):
+            c.execute("""SELECT * FROM somatic_mutation WHERE id=%s""", [cf_som_mut_id])
+            m1 = c.fetchone()
+            if m1[3] == None:
+                c.execute("""SELECT symbol FROM gene WHERE id=%s""", [m1[1]])
+                mut = c.fetchone()[0]
+            else:
+                c.execute("""SELECT locus_name FROM locus WHERE id=%s """, [m1[3]]) # test: make sure this gets loci
+                mut = c.fetchone()[0]
+            
+            c.execute("""
+                SELECT COUNT(*) > 0 FROM bueno_deep_filter bd
+                    JOIN somatic_mutation sm ON bd.somatic_mutation_id = sm.id
+                    LEFT JOIN gene g2 ON sm.ext_id = g2.id
+                    LEFT JOIN locus l on sm.locus_id = l.id
+                    WHERE g2.symbol=%s OR l.locus_name=%s;
+            """, [mut, mut])
+            has_graphs = c.fetchone()[0]
+            if has_graphs > 0:
+                graph_button_style = "inline"
+            else:
+                graph_button_style = "none"
+
+            causal_flows.append([mut, g1, graph_button_style])
+
+            elements.append({'data': { 'id': 'mut%d' % cf_som_mut_id, 'name': mut}, 'classes': 'genotype' }) # feature: differnet colors for genes vs loci
+            elements.append({'data': { 'id': 'cf%d' % cf_pk, 'source': 'mut%d' % cf_som_mut_id, 'target': 'reg%d' % cf_reg_id } })
+
+    causal_flows = sorted(causal_flows, key=lambda mutation: mutation[0])
+
+    # Hallmarks of Cancer
+    c.execute("""SELECT hm.id,hm.name FROM hallmark hm join bic_hal bh on hm.id=bh.hallmark_id
+WHERE bh.bicluster_id=%s""", [bc_pk])
+    hallmarks = []
+    hallmark_to_image = {
+        "Sustained angiogenesis": 5,
+        "Insensitivity to antigrowth signals": 10,
+        "Evading apoptosis": 3,
+        "Evading immune detection": 9,
+        "Tissue invasion and metastasis": 6,
+        "Self sufficiency in growth signals": 1,
+        "Tumor promoting inflammation": 7,
+        "Reprogramming energy metabolism": 2,
+        "Genome instability and mutation": 4,
+        "Limitless replicative potential": 8,
+    }
+    hallmark_image_class = {
+        1: "disabled",
+        2: "disabled",
+        3: "disabled",
+        4: "disabled",
+        5: "disabled",
+        6: "disabled",
+        7: "disabled",
+        8: "disabled",
+        9: "disabled",
+        10: "disabled",
+    }
+    for hm_id, hm_name in c.fetchall():
+        hallmarks.append([hm_name, convert[hm_name] ])
+        elements.append({'data': { 'id': 'hm%d' % hm_id, 'name': hm_name}, 'classes': 'hallmark' })
+        elements.append({'data': { 'id': 'bchm%d' % hm_id, 'source': 'bc%d' % bc_pk, 'target': 'hm%d' % hm_id } })
+        hallmark_image_class[hallmark_to_image[hm_name]] = ""
+    
+    return {
+        "cytoscape": elements,
+        "regulators": regulators,
+        "hallmarks": hallmarks,
+        "hallmark_image_class": hallmark_image_class,
+        "causal_flows": causal_flows,
+    }
 
 ######################################################################
 # Available application paths
@@ -861,9 +1004,6 @@ def bicluster_expression_graph(bicluster=None, phenotype_name="histology_WHO"):
 def bicluster_cytoscape(bicluster=None):
     db = dbconn()
     c = db.cursor()
-    
-    c.execute("SELECT id, name FROM bicluster WHERE name=%s;", [bicluster])
-    bc_pk, bc_name = c.fetchone()
 
     r_cutoff = request.args.get('r_cutoff')
     if r_cutoff != None:
@@ -871,91 +1011,11 @@ def bicluster_cytoscape(bicluster=None):
     else:
         r_cutoff = 0.0
     
-    # Regulators
-    elements = []
-    elements.append({'data': { 'id': 'bc%d' % bc_pk, 'name': bc_name}, 'classes': 'bicluster' })
-
-    regulators = []
-    regulatorIds = []
-    # c.execute("""SELECT g.id, g.symbol, tfr.action FROM tf_regulator tfr join gene g on tfr.gene_id=g.id WHERE tfr.bicluster_id=%s""", [bc_pk])
-    c.execute("""SELECT tfr.id, g.symbol, tfr.r_value, tfr.p_value FROM tf_regulator tfr join gene g on tfr.tf_id=g.id WHERE tfr.bicluster_id=%s""", [bc_pk])
-    tfs = list(c.fetchall())
-    tfList = []
-    for tf in tfs:
-        if abs(tf[2]) < r_cutoff:
-            continue
-        
-        known = 'No'
-
-        tf_action = "Repressor"
-        if tf[2] > 0:
-            tf_action = "Activator"
-
-        regulators.append(['TF', tf[0], tf[1], tf_action, known, "{:.5g}".format(tf[3]), "{:.5g}".format(tf[2])])
-        regulatorIds.append(tf[0])
-        tfList.append(tf[1])
-        elements.append({'data': { 'id': 'reg%d' % tf[0], 'name': tf[1] }, 'classes': 'tf' })
-        elements.append({'data': { 'id': 'tfbc%d' % tf[0], 'source': 'reg%d' % tf[0], 'target': 'bc%d' % bc_pk }, 'classes': "N/A Action" })
-
-    c.execute("""SELECT mirna.id, mirna.name FROM mirna_regulator mr join mirna on mirna.id=mr.mirna_id WHERE mr.bicluster_id=%s""", [bc_pk])
-    mirnas = list(c.fetchall())
-
-    mirnaList = []
-    for mirna in mirnas:
-        if not mirna[0] in mirnaList:
-            # our known is yes if we can find any mirna's given the mirna sql id
-            known = 'No'
-            c.execute("""SELECT COUNT(*) FROM mirna_prior WHERE mirna_id=%s""", [mirna[0]])
-            mirna_count = c.fetchone()[0]
-            if mirna_count != 0:
-                known = 'Yes'
-            
-            regulators.append(['miRNA', mirna[0], mirna[1], 'Repressor', known])
-            mirnaList.append(mirna[1])
-            elements.append({'data': { 'id': 'reg%d' % mirna[0], 'name': mirna[1]}, 'classes': 'mirna' })
-            elements.append({'data': { 'id': 'mirnabc%d' % mirna[0], 'source': 'reg%d' % mirna[0], 'target': 'bc%d' % bc_pk }, 'classes': 'repressor' })
-
-    regulators = sorted(regulators, key=lambda name: name[1])
-
-    # Get causal flows with bicluster
-    c.execute("""SELECT id,somatic_mutation_id,regulator_id,regulator_type,bicluster_id,leo_nb_atob,mlogp_m_atob
-FROM causal_flow WHERE bicluster_id=%s""", [bc_pk])
-    tmp_cf = c.fetchall()
-
-    for cf_pk, cf_som_mut_id, cf_reg_id, cf_reg_type, cf_bc_id, cf_leo, cf_mlogp in tmp_cf:
-        if cf_reg_id not in regulatorIds:
-            continue
-        
-        if cf_reg_type == 'tf':
-            c.execute("""SELECT g.symbol FROM tf_regulator tr JOIN gene g ON tr.tf_id = g.id WHERE tr.id=%s""", [cf_reg_id])
-            g1 = c.fetchone()[0]
-        else:
-            c.execute("""SELECT m.name FROM mirna_regulator mr JOIN mirna m ON mr.mirna_id = m.id WHERE mr.id=%s""", [cf_reg_id])
-            g1 = c.fetchone()[0]
-
-        if (cf_reg_type == 'tf' and g1 in tfList) or (cf_reg_type == 'mirna' and g1 in mirnaList):
-            c.execute("""SELECT * FROM somatic_mutation WHERE id=%s""", [cf_som_mut_id])
-            m1 = c.fetchone()
-            if m1[3] == None:
-                c.execute("""SELECT symbol FROM gene WHERE id=%s""", [m1[1]])
-                mut = c.fetchone()[0]
-            else:
-                c.execute("""SELECT locus_name FROM locus WHERE id=%s """, [m1[3]]) # test: make sure this gets loci
-                mut = c.fetchone()[0]
-
-            elements.append({'data': { 'id': 'mut%d' % cf_som_mut_id, 'name': mut}, 'classes': 'genotype' }) # feature: differnet colors for genes vs loci
-            elements.append({'data': { 'id': 'cf%d' % cf_pk, 'source': 'mut%d' % cf_som_mut_id, 'target': 'reg%d' % cf_reg_id } })
-
-    # Hallmarks of Cancer
-    c.execute("""SELECT hm.id,hm.name FROM hallmark hm join bic_hal bh on hm.id=bh.hallmark_id
-WHERE bh.bicluster_id=%s""", [bc_pk])
-    for hm_id, hm_name in c.fetchall():
-        elements.append({'data': { 'id': 'hm%d' % hm_id, 'name': hm_name}, 'classes': 'hallmark' })
-        elements.append({'data': { 'id': 'bchm%d' % hm_id, 'source': 'bc%d' % bc_pk, 'target': 'hm%d' % hm_id } })
+    info = get_regulator_info(bicluster, r_cutoff)
     
     return json.dumps({
-        "cytoscape": elements,
-        "regulators": regulators,
+        "cytoscape": info["cytoscape"],
+        "regulators": info["regulators"],
     })
 
 @app.route('/bicluster/<bicluster>')
@@ -1010,96 +1070,12 @@ FROM bicluster WHERE name=%s""", [bicluster])
 
         replication.append(list(i)+[repConvert[i[2]], repPubmed[i[2]]]+tmp1)
 
-    regulators = []
-    # c.execute("""SELECT g.id, g.symbol, tfr.action FROM tf_regulator tfr join gene g on tfr.gene_id=g.id WHERE tfr.bicluster_id=%s""", [bc_pk])
-    c.execute("""SELECT tfr.id, g.symbol, tfr.r_value, tfr.p_value FROM tf_regulator tfr join gene g on tfr.tf_id=g.id WHERE tfr.bicluster_id=%s""", [bc_pk])
-    tfs = list(c.fetchall())
-    tfList = []
-    for tf in tfs:
-        tfList.append(tf[1])
-
-    c.execute("""SELECT mirna.id, mirna.name FROM mirna_regulator mr join mirna on mirna.id=mr.mirna_id WHERE mr.bicluster_id=%s""", [bc_pk])
-    mirnas = list(c.fetchall())
-
-    mirnaList = []
-    for mirna in mirnas:
-        if not mirna[0] in mirnaList:
-            mirnaList.append(mirna[1])
-
-    regulators = sorted(regulators, key=lambda name: name[1])
-
-    # Get causal flows with bicluster
-    c.execute("""SELECT id,somatic_mutation_id,regulator_id,regulator_type,bicluster_id,leo_nb_atob,mlogp_m_atob
-FROM causal_flow WHERE bicluster_id=%s""", [bc_pk])
-    tmp_cf = c.fetchall()
-    causalFlows = []
-
-    for cf_pk, cf_som_mut_id, cf_reg_id, cf_reg_type, cf_bc_id, cf_leo, cf_mlogp in tmp_cf:
-        if cf_reg_type == 'tf':
-            c.execute("""SELECT g.symbol FROM tf_regulator tr JOIN gene g ON tr.tf_id = g.id WHERE tr.id=%s""", [cf_reg_id])
-            g1 = c.fetchone()[0]
-        else:
-            c.execute("""SELECT m.name FROM mirna_regulator mr JOIN mirna m ON mr.mirna_id = m.id WHERE mr.id=%s""", [cf_reg_id])
-            g1 = c.fetchone()[0]
-
-        if (cf_reg_type == 'tf' and g1 in tfList) or (cf_reg_type == 'mirna' and g1 in mirnaList):
-            c.execute("""SELECT * FROM somatic_mutation WHERE id=%s""", [cf_som_mut_id])
-            m1 = c.fetchone()
-            if m1[3] == None:
-                c.execute("""SELECT symbol FROM gene WHERE id=%s""", [m1[1]])
-                mut = c.fetchone()[0]
-            else:
-                c.execute("""SELECT locus_name FROM locus WHERE id=%s """, [m1[3]]) # test: make sure this gets loci
-                mut = c.fetchone()[0]
-            
-            c.execute("""
-                SELECT COUNT(*) > 0 FROM bueno_deep_filter bd
-                    JOIN somatic_mutation sm ON bd.somatic_mutation_id = sm.id
-                    LEFT JOIN gene g2 ON sm.ext_id = g2.id
-                    LEFT JOIN locus l on sm.locus_id = l.id
-                    WHERE g2.symbol=%s OR l.locus_name=%s;
-            """, [mut, mut])
-            has_graphs = c.fetchone()[0]
-            if has_graphs > 0:
-                graph_button_style = "inline"
-            else:
-                graph_button_style = "none"
-
-            causalFlows.append([mut, g1, graph_button_style])
-
-    causalFlows = sorted(causalFlows, key=lambda mutation: mutation[0])
-
-    # Hallmarks of Cancer
-    c.execute("""SELECT hm.id,hm.name FROM hallmark hm join bic_hal bh on hm.id=bh.hallmark_id
-WHERE bh.bicluster_id=%s""", [bc_pk])
-    hallmarks = []
-    hallmark_to_image = {
-        "Sustained angiogenesis": 5,
-        "Insensitivity to antigrowth signals": 10,
-        "Evading apoptosis": 3,
-        "Evading immune detection": 9,
-        "Tissue invasion and metastasis": 6,
-        "Self sufficiency in growth signals": 1,
-        "Tumor promoting inflammation": 7,
-        "Reprogramming energy metabolism": 2,
-        "Genome instability and mutation": 4,
-        "Limitless replicative potential": 8,
-    }
-    hallmark_image_class = {
-        1: "disabled",
-        2: "disabled",
-        3: "disabled",
-        4: "disabled",
-        5: "disabled",
-        6: "disabled",
-        7: "disabled",
-        8: "disabled",
-        9: "disabled",
-        10: "disabled",
-    }
-    for hm_id, hm_name in c.fetchall():
-        hallmarks.append([hm_name, convert[hm_name] ])
-        hallmark_image_class[hallmark_to_image[hm_name]] = ""
+    info = get_regulator_info(bicluster, 0)
+    # set variables for template to use
+    causal_flows = info["causal_flows"]
+    regulators = info["regulators"]
+    hallmark_image_class = info["hallmark_image_class"]
+    hallmarks = info["hallmarks"]
 
     # GO
     c.execute(

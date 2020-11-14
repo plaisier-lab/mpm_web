@@ -660,7 +660,13 @@
           }
         }
 
-        loadRegulators(0)
+        let defaultRValueCutoff = 0.4
+        loadRegulators(defaultRValueCutoff)
+        document.getElementById("rvalue-cutoff-range").value = defaultRValueCutoff
+        document.getElementById("rvalue-cutoff-range-clone").value = defaultRValueCutoff
+        document.getElementById("rvalue-cutoff-input").value = defaultRValueCutoff
+        document.getElementById("rvalue-cutoff-input-clone").value = defaultRValueCutoff
+        
 
         let handleRValueInput = (event) => {
           document.getElementById("rvalue-cutoff-range").value = event.target.value
@@ -767,7 +773,7 @@
               <th class='text-center'>Regulators</th><th class='text-center'>Causal Flows</th><th class='text-center'>Enriched GO BPs</th><th class='text-center'>Enriched<br>Hallmarks of Cancer</th>
           </tr>
           <tr>
-            <td><a href='#regulators'>{{ regulators | count }}</a></td><td><a href='#causal'>{{ causalFlows | count }}</a></td><td><a href='#gobp'>{{ gobps | count }}</a></td><td><a href='#hallmarks'>{{ hallmarks | count }}</a></td>
+            <td><a href='#regulators'>{{ regulators | count }}</a></td><td><a href='#causal'>{{ causal_flows | count }}</a></td><td><a href='#gobp'>{{ gobps | count }}</a></td><td><a href='#hallmarks'>{{ hallmarks | count }}</a></td>
           </tr>
         </table>
       </div>
@@ -863,7 +869,7 @@
               <span style='font-weight: bold;'>Causal Flows</span>
             </th>
           </tr>
-          {% for cf1 in causalFlows %}
+          {% for cf1 in causal_flows %}
           <tr>
             <td valign="middle">
               <span style='color:#990000'>{{ cf1[0] }}</span>
