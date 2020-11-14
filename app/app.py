@@ -890,6 +890,15 @@ def bicluster_expression_graph(bicluster=None, phenotype_name="histology_WHO"):
             "colors": enrichment_colors,
         }
     else:
+        c.execute("""
+            SELECT e.value, pt.name FROM eigengene e
+            JOIN patient pt on e.patient_id = pt.id
+            JOIN bicluster b ON e.bicluster_id = b.id
+            WHERE b.name = %s;""",
+            [bicluster]
+        )
+        eigengene_values = c.fetchall()
+        
         js_scatterplot = {
             "name": "Values",
             "data": [],
@@ -903,14 +912,17 @@ def bicluster_expression_graph(bicluster=None, phenotype_name="histology_WHO"):
         all_data = []
         highest_x = -10000
         lowest_x = 10000
-        for i, item in enumerate(all_boxplot_data):
-            x = item[3] # get the median
-            y = value_ptmap[patients[i]]
+        for eigengene_value, patient in eigengene_values:
+            if patient not in value_ptmap:
+                continue
+
+            x = eigengene_value
+            y = value_ptmap[patient]
             
             js_scatterplot["data"].append({
                 "x": x,
                 "y": y,
-                "name": patients[i],
+                "name": patient,
                 "color": get_phenotype_color(phenotype_name, y, phenotype_min_max),
             })
 
@@ -929,7 +941,7 @@ def bicluster_expression_graph(bicluster=None, phenotype_name="histology_WHO"):
         regression = LinearRegression().fit([(i[0],) for i in all_data], flattened_y)
             
         js_enrichment_scatter = {
-            "biclusterName": "{} Median Expression".format(bicluster),
+            "biclusterName": "{} Eigengene Expression".format(bicluster),
             "phenotypeName": "{} Value".format(PHENOTYPE_INDEX_TO_UINAME[phenotype_name]),
             "scatter": {
                 "data": js_scatterplot,
