@@ -51,6 +51,8 @@ import time
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 
+from scipy import stats
+
 """
 ###########################
 ## Open database session ##
@@ -162,8 +164,7 @@ with open('data/hsa.mature.fa', 'r') as inFile:
 
 print("mesothelioma_norm.csv...")
 # Read in gene expression matrix (Genentech)
-gexp1 = pd.read_csv('data/mesothelioma_norm.csv',
-                    header=0, index_col=0, sep=',')
+gexp1 = pd.read_csv('data/mesothelioma_norm.csv', header=0, index_col=0, sep=',')
 
 # Load up patient information (Genentech)
 patients = {}
@@ -728,17 +729,17 @@ def isfloat(value):
         return False
 
 # parse phenotypes
+phenotypes = {}
 with open('data/phenotypes_meso_noFilter.csv') as in_file:
     # read header
     header = in_file.readline().split(",")
-    header_to_phenotype = {}
     for i in range(1, len(header)):
         name = header[i].strip()
-        header_to_phenotype[name] = Phenotype( \
+        phenotypes[name] = Phenotype( \
             name = name,
             long_name = name,
         )
-        db.session.add(header_to_phenotype[name])
+        db.session.add(phenotypes[name])
     
     db.session.commit()
 
@@ -753,13 +754,13 @@ with open('data/phenotypes_meso_noFilter.csv') as in_file:
                 phenotype_value = parsed[i].strip()
                 if isfloat(phenotype_value): # handle floats
                     db.session.add(PhenoDatum( \
-                        phenotype_id = header_to_phenotype[phenotype_name].id,
+                        phenotype_id = phenotypes[phenotype_name].id,
                         patient_id = current_patient.id,
                         phenotype_value = float(phenotype_value),
                     ))
                 else: # handle strings
                     db.session.add(PhenoDatum( \
-                        phenotype_id = header_to_phenotype[phenotype_name].id,
+                        phenotype_id = phenotypes[phenotype_name].id,
                         patient_id = current_patient.id,
                         phenotype_string = phenotype_value,
                     ))
@@ -1057,5 +1058,48 @@ with open("./data/oncoMerged_MESO/oncoMerge_mergedMuts.csv") as file:
 read_eigengenes("./data/eigengenes/biclusterEigengenes_pita.csv", "pita")
 read_eigengenes("./data/eigengenes/biclusterEigengenes_targetscan.csv", "targetscan")
 read_eigengenes("./data/eigengenes/biclusterEigengenes_tfbs_db.csv", "tfbs_db")
+
+# find bicluster phenotype significances
+for bicluster in biclusters.values():
+    bicluster_name = bicluster.name
+    for phenotype in phenotypes.values():
+        print(bicluster_name, phenotype.name)
+        
+        values = db.engine.execute(
+            "SELECT p.name, pd.phenotype_value FROM patient p "
+            + "JOIN pheno_data pd ON pd.patient_id=p.id "
+            + "JOIN phenotype pt ON pd.phenotype_id=pt.id "
+            + "WHERE pt.name = '%s';" % phenotype.name
+        )
+        value_ptmap = {patient: value for patient, value in values}
+
+        result = db.engine.execute(
+            "SELECT e.value, pt.name FROM eigengene e "
+            + "JOIN patient pt on e.patient_id = pt.id "
+            + "JOIN bicluster b ON e.bicluster_id = b.id "
+            + "WHERE b.name = '%s';" % bicluster_name
+        )
+
+        eigengene_values = []
+        phenotype_values = []
+        for eigengene_value, patient in result:
+            if patient not in value_ptmap or value_ptmap[patient] == None:
+                continue
+
+            eigengene_values.append(eigengene_value)
+            phenotype_values.append(value_ptmap[patient])
+
+        if len(eigengene_values) > 0:
+            found_stats = stats.pearsonr(eigengene_values, phenotype_values)
+
+            db.session.add(
+                BiclusterPhenotypeSignificance(
+                    bicluster_id = bicluster.id,
+                    phenotype_id = phenotype.id,
+                    p_value = found_stats[1],
+                )
+            )
+
+db.session.commit()
 
 print("program took {} seconds to complete".format(time.time() - start_time))

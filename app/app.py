@@ -188,6 +188,9 @@ SELECTABLE_PHENOTYPES = [
     ("Neutrophils", "Neutrophils"),
 ]
 
+# blacklist for phenotypes we don't want to check p-values for
+SELECTABLE_PHENOTYPES_BLACKLIST = ["histology_WHO", "sex", "age_at_surgery", "preop_treatment"]
+
 USE_PHENOTYPE_SCATTERPLOT = True
 
 PHENOTYPE_INDEX_TO_UINAME = {item[1]: item[0] for item in SELECTABLE_PHENOTYPES}
@@ -842,10 +845,11 @@ def bicluster_expression_graph(bicluster=None, phenotype_name="histology_WHO"):
 
     patients = [item[0] for item in all_boxplot_data]
 
-    c.execute("SELECT p.name, pd.phenotype_string, pd.phenotype_value FROM patient p"
-        + " JOIN pheno_data pd ON pd.patient_id=p.id"
-        + " JOIN phenotype pt ON pd.phenotype_id=pt.id"
-        + " WHERE p.name IN (" + (','.join(map(lambda p: '\'%s\'' % p, patients))) + ") AND pt.name=%s;",
+    c.execute("""
+        SELECT p.name, pd.phenotype_string, pd.phenotype_value FROM patient p
+        JOIN pheno_data pd ON pd.patient_id=p.id
+        JOIN phenotype pt ON pd.phenotype_id=pt.id
+        WHERE pt.name=%s;""",
         [phenotype_name]
     )
     values = c.fetchall()
@@ -1048,7 +1052,26 @@ FROM bicluster WHERE name=%s""", [bicluster])
         'survival_pval': bc_survival_pval,
         'varexp_flag': bc_varexp_fpc_pval <= 0.05,
         'survival_flag': bc_survival_pval <= 0.05
-        }
+    }
+    
+    # select phenotype/bicluster relationships where the p-value is at 95% significance
+    c.execute(
+        """SELECT bps.p_value, p.name FROM bicluster_phenotype_significance bps
+        JOIN bicluster b ON b.id = bps.bicluster_id
+        JOIN phenotype p ON p.id = bps.phenotype_id
+        WHERE b.id = %s AND p_value < 0.05;""",
+        [bc_pk]
+    )
+    data = c.fetchall()
+    phenotype_to_p_value = {datum[1]: datum[0] for datum in data}
+
+    expression_selectable_phenotypes = []
+    for uiName, dbName in SELECTABLE_PHENOTYPES:
+        if (
+            dbName in SELECTABLE_PHENOTYPES_BLACKLIST
+            or dbName in phenotype_to_p_value
+        ):
+            expression_selectable_phenotypes.append((uiName, dbName))
 
     c.execute("""SELECT g.id, g.symbol, g.entrez FROM bic_gene bg join gene g on bg.gene_id=g.id where bg.bicluster_id=%s order by g.symbol""", [bc_pk])
     genes = list(c.fetchall())

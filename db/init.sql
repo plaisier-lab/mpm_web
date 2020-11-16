@@ -271,3 +271,14 @@ CREATE TABLE bueno_deep_filter (
     FOREIGN KEY (patient_id) REFERENCES patient (id),
     FOREIGN KEY (somatic_mutation_id) REFERENCES somatic_mutation (id)
 );
+
+CREATE TABLE bicluster_phenotype_significance (
+    id integer unsigned NOT NULL AUTO_INCREMENT,
+    bicluster_id integer unsigned,
+    phenotype_id integer unsigned,
+    p_value float,
+
+    PRIMARY KEY (id),
+    FOREIGN KEY (bicluster_id) REFERENCES bicluster (id),
+    FOREIGN KEY (phenotype_id) REFERENCES phenotype (id)
+);

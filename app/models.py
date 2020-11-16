@@ -318,3 +318,14 @@ class Eigengene(db.Model):
 
     bicluster = db.relationship('Bicluster', primaryjoin='Eigengene.bicluster_id == Bicluster.id', backref='eigengene')
     patient = db.relationship('Patient', primaryjoin='Eigengene.patient_id == Patient.id', backref='eigengene')
+
+class BiclusterPhenotypeSignificance(db.Model):
+    __tablename__ = 'bicluster_phenotype_significance'
+
+    id = db.Column(db.Integer, primary_key=True)
+    bicluster_id = db.Column(db.ForeignKey('bicluster.id'), index=True)
+    phenotype_id = db.Column(db.ForeignKey('phenotype.id'), index=True)
+    p_value = db.Column(db.Float)
+
+    bicluster = db.relationship('Bicluster', primaryjoin='BiclusterPhenotypeSignificance.bicluster_id == Bicluster.id', backref='bicluster_phenotype_significance')
+    phenotype = db.relationship('Phenotype', primaryjoin='BiclusterPhenotypeSignificance.phenotype_id == Phenotype.id', backref='bicluster_phenotype_significance')
