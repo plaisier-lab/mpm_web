@@ -1,5 +1,68 @@
 img.displayed {
-    display: block;
-    margin-left: auto;
-    margin-right: auto;
+	display: block;
+	margin-left: auto;
+	margin-right: auto;
+}
+
+.search-container {
+	display: flex;
+	flex-direction: column;
+	width: 350px;
+	margin: auto;
+}
+
+.search-examples {
+	text-align: center;
+	margin-top: 10px;
+}
+
+.advanced-search-button {
+	font-size: 11pt;
+	text-decoration: underline;
+	cursor: pointer;
+}
+
+.advanced-search {
+	margin-top: 0px;
+}
+
+.advanced-search select {
+	margin-bottom: 5px;
+}
+
+.filter-container {
+	display: flex;
+	flex-direction: column;
+}
+
+.filter-container div {
+	display: flex;
+	align-items: center;
+	width: 100%;
+	margin: 5px 0px;
+}
+
+.filter-container div select {
+	width: 100%;
+	margin-left: 10px;
+}
+
+.filter-container div .glyphicon {
+	font-size: 15pt;
+	cursor: pointer;
+}
+
+.add-filter {
+	display: block;
+	text-align: center;
+	font-size: 15pt;
+	cursor: pointer;
+}
+
+button:active {
+	outline: 0 !important;
+}
+
+button:focus {
+	outline: 0 !important;
 }

@@ -26,6 +26,7 @@ import traceback as tb
 import logging
 import json
 import os
+from os import path, walk
 import csv
 from functools import wraps
 
@@ -49,6 +50,19 @@ NUM_PARTS = 5
 
 convert = {'Evading apoptosis': 'cellDeath.gif', 'Evading immune detection': 'avoidImmuneDestruction.gif', 'Genome instability and mutation': 'genomicInstability.gif', 'Insensitivity to antigrowth signals': 'evadeGrowthSuppressors.gif', 'Limitless replicative potential': 'immortality.gif',
     'Reprogramming energy metabolism': 'cellularEnergetics.gif', 'Self sufficiency in growth signals': 'sustainedProliferativeSignalling.gif', 'Sustained angiogenesis': 'angiogenesis.gif', 'Tissue invasion and metastasis': 'invasion.gif', 'Tumor promoting inflammation': 'promotingInflammation.gif'}
+
+HALLMARKS = [
+    'Evading apoptosis',
+    'Evading immune detection',
+    'Genome instability and mutation',
+    'Insensitivity to antigrowth signals',
+    'Limitless replicative potential',
+    'Reprogramming energy metabolism',
+    'Self sufficiency in growth signals',
+    'Sustained angiogenesis',
+    'Tissue invasion and metastasis',
+    'Tumor promoting inflammation',
+]
 
 print(os.getcwd())
 
@@ -516,9 +530,22 @@ def unhandled_exception(e):
     app.logger.exception(e)
     return render_template('unknown_error.html')
 
+def get_index_locals():
+    selectable_phenotypes = [('None', '')]
+    for name, value in SELECTABLE_PHENOTYPES:
+        if value not in SELECTABLE_PHENOTYPES_BLACKLIST:
+            selectable_phenotypes.append((name, value))
+    
+    hallmarks = [('None', '')]
+    for hallmark in HALLMARKS:
+        hallmarks.append((hallmark, hallmark))
+        
+    return [hallmarks, selectable_phenotypes]
+
 @app.route('/')
 def index():
-    return render_template('index.html')
+    hallmarks, selectable_phenotypes = get_index_locals()
+    return render_template('index.html', hallmarks = hallmarks, selectable_phenotypes = selectable_phenotypes)
 
 @app.route('/bicluster-causal-analysis/<mutation>/<regulator>/<bicluster>/<phenotype_name>')
 # mutation and regulator are gene symbol names, bicluster is the bicluster name
@@ -1140,11 +1167,16 @@ FROM bicluster WHERE name=%s""", [bicluster])
 @app.route('/search')
 def search():
     gene = request.args.get('gene')
+    phenotype = request.args.get('phenotype')
+    hallmark = request.args.get('hallmark')
+
     db = dbconn()
     c = db.cursor()
     bme_type ='gene'
-    if not gene:
-        return render_template('index.html')
+    if not gene and phenotype == "None" and hallmark == "None":
+        hallmarks, selectable_phenotypes = get_index_locals()
+        return render_template('index.html', hallmarks = hallmarks, selectable_phenotypes = selectable_phenotypes, invalid_gene = True)
+
     if gene.find('hsa-')==-1:
         c.execute("""SELECT symbol FROM gene WHERE symbol=%s""", [gene])
         geneData = c.fetchall()
@@ -1154,31 +1186,44 @@ def search():
         bme_type = 'mirna'
     db.close()
 
-    if len(geneData)==0:
-        return render_template('index.html')
+    if len(geneData)==0 and phenotype == "None" and hallmark == "None":
+        hallmarks, selectable_phenotypes = get_index_locals()
+        return render_template('index.html', hallmarks = hallmarks, selectable_phenotypes = selectable_phenotypes, invalid_gene = True)
+
+    query_statements = []
+    if phenotype:
+        query_statements.append("phenotype=%s" % phenotype)
+    
+    if hallmark:
+        query_statements.append("hallmark=%s" % hallmark)
+    
+    query_statement = ""
+    if len(query_statements):
+        query_statement = "?%s" % "&".join(query_statements)
 
     symbol = geneData[0][0]
     if bme_type == 'gene':
-        return redirect(url_for('gene', symbol=symbol))
+        return redirect(url_for('gene', symbol=symbol) + query_statement)
     else:
-        return redirect(url_for('mirna', symbol=symbol))
+        return redirect(url_for('mirna', symbol=symbol) + query_statement)
 
 
-def __get_muts(c, gene_pk, symbol):
+def __get_muts(c, gene_pk, symbol, hallmark_filter=None):
     # Get causal flows downstream of mutation in gene
     muts = {}
+    muts['name'] = symbol
+    muts['flows'] = 0
+    muts['regs'] = []
+    muts['tfs'] = []
+    muts['miRNAs'] = []
+    muts['biclusters'] = []
+    muts['data'] = []
+
     c.execute("""SELECT * FROM somatic_mutation WHERE locus_id IS NULL AND ext_id=%s""", [gene_pk]) # discrep. (we never have a mutation type of gene). test: make sure that we only get genes (not loci) from this query
     tmp_muts = c.fetchall()
     if len(tmp_muts)==1:
-        muts['name'] = symbol
         c.execute("""SELECT * FROM causal_flow WHERE somatic_mutation_id=%s""", [tmp_muts[0][0]])
         tmp_cf = c.fetchall()
-        muts['flows'] = 0
-        muts['regs'] = []
-        muts['tfs'] = []
-        muts['miRNAs'] = []
-        muts['biclusters'] = []
-        muts['data'] = []
         for cf1 in tmp_cf:
             g1 = ''
             if cf1[3]=='tf':
@@ -1200,28 +1245,34 @@ def __get_muts(c, gene_pk, symbol):
                     if not g1 in muts['regs']:
                         muts['regs'].append(g1)
                         muts['miRNAs'].append(g1)
+            
+            # print the bicluster in the table
             if not g1=='':
                 c.execute("""SELECT name, survival, survival_p_value FROM bicluster WHERE id=%s""", [cf1[4]])
                 b1 = c.fetchall()[0]
-                if not b1 in muts['biclusters']:
-                    muts['biclusters'].append(b1[0])
-                c.execute("SELECT hm.name FROM hallmark hm join bic_hal bh on hm.id=bh.hallmark_id  WHERE bh.bicluster_id=%s",
-                          [cf1[4]])
+                c.execute(
+                    "SELECT hm.name FROM hallmark hm join bic_hal bh on hm.id=bh.hallmark_id  WHERE bh.bicluster_id=%s",
+                    [cf1[4]]
+                )
+                tmp1 = [i[0] for i in c.fetchall()]
 
-                tmp1 = c.fetchall()
-                h1 = list(set([convert[i[0]] for i in tmp1]))
-                h2 = [[i[0],convert[i[0]]] for i in tmp1]
-                muts['data'].append([symbol, g1, b1[0], b1[1], b1[2], h2])
+                if hallmark_filter == None or hallmark_filter in tmp1:
+                    h1 = list(set([convert[i] for i in tmp1]))
+                    h2 = [(i,convert[i]) for i in tmp1]
+                    muts['data'].append([symbol, g1, b1[0], b1[1], b1[2], h2])
+
+                    if not b1 in muts['biclusters']:
+                        muts['biclusters'].append(b1[0])
     return muts
 
 
-def __get_regulators(c, symbol, bme_type):
+def __get_regulators(c, symbol, bme_type, hallmark_filter=None):
     regs = {}
+    regs['name'] = symbol
+    regs['biclusters'] = 0
+    regs['data'] = []
     tmp_regs = c.fetchall()
-    if len(tmp_regs)>0:
-        regs['name'] = symbol
-        regs['biclusters'] = len(set([i[1] for i in tmp_regs]))
-        regs['data'] = []
+    if len(tmp_regs) > 0:
         # Collect all biclusters downstream regulated by TF or miRNA
         for reg in tmp_regs:
             action = 'Rep.'
@@ -1231,10 +1282,14 @@ def __get_regulators(c, symbol, bme_type):
             b1 = c.fetchall()[0]
             c.execute("SELECT hm.name FROM hallmark hm join bic_hal bh on hm.id=bh.hallmark_id WHERE bh.bicluster_id=%s",
                       [reg[1]])
-            tmp1 = c.fetchall()
-            h1 = list(set([convert[i[0]] for i in tmp1]))
-            h2 = [[i[0],convert[i[0]]] for i in tmp1]
-            regs['data'].append([symbol, action, b1[0], b1[1], b1[2], h2])
+            tmp1 = [i[0] for i in c.fetchall()]
+
+            # filter hallmarks using advanced search parameters
+            if hallmark_filter == None or hallmark_filter in tmp1:
+                h1 = list(set([convert[i] for i in tmp1]))
+                h2 = [(i,convert[i]) for i in tmp1]
+                regs['data'].append([symbol, action, b1[0], b1[1], b1[2], h2])
+                regs['biclusters'] = regs['biclusters'] + 1
     return regs
 
 
@@ -1256,29 +1311,44 @@ def mirna(symbol=None, defaults={'symbol': None}):
 @app.route('/gene')
 @app.route('/gene/<symbol>')
 def gene(symbol=None, defaults={'symbol': None}):
+    phenotype = request.args.get('phenotype')
+    phenotype = phenotype if phenotype else None
+    hallmark = request.args.get('hallmark')
+    hallmark = hallmark if hallmark else None
+    
     db = dbconn()
     c = db.cursor()
     c.execute("""SELECT id FROM gene WHERE symbol=%s""", [symbol])
     gene_pk = c.fetchone()[0]
-    muts = __get_muts(c, gene_pk, symbol)
+    muts = __get_muts(c, gene_pk, symbol, hallmark_filter=hallmark)
+
     c.execute("""SELECT * FROM tf_regulator WHERE tf_id=%s""", [gene_pk])
-    regs = __get_regulators(c, symbol, "gene")
+    regs = __get_regulators(c, symbol, "gene", hallmark_filter=hallmark)
 
     # Get biclusters that gene resides
     bics = {}
-    c.execute("SELECT * FROM bic_gene bg join bicluster b on bg.bicluster_id=b.id where bg.gene_id=%s", [gene_pk])
+    bics['name'] = gene
+    bics['biclusters'] = 0
+    bics['data'] = []
+    c.execute(
+        """SELECT * FROM bic_gene bg
+        JOIN bicluster b ON bg.bicluster_id=b.id
+        WHERE bg.gene_id=%s""",
+        [gene_pk]
+    )
     tmp_bics = c.fetchall()
     if len(tmp_bics) > 0:
-        bics['name'] = gene
-        bics['biclusters'] = len(tmp_bics)
-        bics['data'] = []
         for bic1 in tmp_bics:
             c.execute("SELECT hm.name FROM bic_hal bh JOIN hallmark hm on bh.hallmark_id=hm.id WHERE bh.bicluster_id=%s",
                       [bic1[3]])
-            tmp1 = c.fetchall()
-            h1 = list(set([convert[i[0]] for i in tmp1]))
-            h2 = [[i[0],convert[i[0]]] for i in tmp1]
-            bics['data'].append([bic1[4], bic1[5], bic1[6], bic1[7], bic1[8], h2])
+            tmp1 = [i[0] for i in c.fetchall()]
+
+            # filter hallmarks using advanced search parameters
+            if hallmark == None or hallmark in tmp1:
+                h1 = list(set([convert[i] for i in tmp1]))
+                h2 = [(i,convert[i]) for i in tmp1]
+                bics['data'].append([bic1[4], bic1[5], bic1[6], bic1[7], bic1[8], h2])
+                bics['biclusters'] = bics['biclusters'] + 1
     db.close()
     return render_template('search.html', gene=symbol, muts=muts, regs=regs, bics=bics)
 

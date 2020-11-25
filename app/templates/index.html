@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 {% block title %}Index{% endblock %}
 {% block scripts %}
+<script type="text/javascript" src="/static/js/advanced-search.js"></script>
+
 <script type="text/javascript">
   function geneAutocomplete() {
     $('#term').autocomplete({
@@ -16,26 +18,69 @@
 {% block content %}
 <div class="container-fluid" style="margin-top: 40px;"></div>
 <img class='displayed' alt='mpmSYGNAL Transcriptional Regulaotry Network' style="width:600px;" src='/static/images/mpmSygnalNetwork.png' />
-<div class='text-center bs-callout bs-callout-default'>
-  <h4>
-    Search for gene or somatic mutation: <span class="glyphicon glyphicon-info-sign" data-toggle='collapse' data-target='#searchHelp' style='color:#600;)'></span>
-  </h4>
-  <center>
-    <div id='searchHelp' class='collapse' style='text-align:justify;width:500px;'>Search for genes or regulators from
+<div class='bs-callout bs-callout-default'>
+  <div class='search-container'>
+    {% if invalid_gene %}
+      <div class="alert alert-danger" role="alert">Could not find the searched gene.</div>
+    {% endif %}
+    <h4>
+      Search for gene or somatic mutation: <span class="glyphicon glyphicon-info-sign" data-toggle='collapse' data-target='#searchHelp' style='color:#600;'></span>
+    </h4>
+    <div id='searchHelp' class='collapse' style='text-align: justify; width: 350px;'>Search for genes or regulators from
       the mpmSYGNAL network by using autocomplete in the search field based on your input. For example input IRF and it
       brings up all the possbile matches. Then select the correct search term from the drop down list and click the
       Search button to find all the somatic mutations, regulators or bilcusters with that gene/miRNA.
     </div>
-  </center>
-  <form id="searchform" action="search" method="get">
-    <input id="term" name="gene" type="search" size=35>
-    <button type="submit" class="btn btn-danger" value="search">
-      <span class="glyphicon glyphicon-search" aria-hiddne="true"></span> Search
-    </button>
-  </form>
-  <br>
-  (Examples: somatic mutation = <a href='/gene/NF2'>NF2</a>, regulator = <a href='/gene/E2F1'>E2F1</a> or <a href='/mirna/hsa-mir-29a-3p '>hsa-mir-29a-3p </a>, and gene in bicluster = <a href='/gene/ABO'>ABO</a>)
+    <form id="searchform" action="search" method="get">
+      <div style='display: flex;'>
+        <input id="term" name="gene" type="search" size=35 style='width: 100%;'>
+        <button type="submit" class="btn btn-danger" value="search" style='border-top-left-radius: 0px; border-bottom-left-radius: 0px;'>
+          <span class="glyphicon glyphicon-search" aria-hiddne="true"></span> Search
+        </button>
+      </div>
+      <div class='advanced-search-button' id='advanced-search-button'>Advanced Search <span class="glyphicon glyphicon-triangle-right" id="advanced-search-glyphicon" aria-hiddne="true" style="top: 2px;"></span></div>
+      <script>
+        document.getElementById("advanced-search-button").addEventListener("click", (event) => {
+          if(document.getElementById("advanced-search-glyphicon").classList.contains("glyphicon-triangle-right")) {
+            document.getElementById("advanced-search-glyphicon").classList.remove("glyphicon-triangle-right")
+            document.getElementById("advanced-search-glyphicon").classList.add("glyphicon-triangle-bottom")
+            document.getElementById("advanced-search").style.display = "block"
+          }
+          else {
+            document.getElementById("advanced-search-glyphicon").classList.remove("glyphicon-triangle-bottom")
+            document.getElementById("advanced-search-glyphicon").classList.add("glyphicon-triangle-right")
+            document.getElementById("advanced-search").style.display = "none"
+          }
+        })
+      </script>
+      <div class='advanced-search bs-callout bs-callout-default' id="advanced-search" style="display: none;">
+        <label for="phenotype">Significant Phenotype-Bicluster Correlation</label>
+        <select id="phenotype" name="phenotype" class="form-control">
+          {% for phenotype in selectable_phenotypes %}
+            <option value="{{ phenotype[1] }}">{{ phenotype[0] }}</option>
+          {% endfor %}
+        </select>
+        <!--<div id="extra-phenotypes" class="filter-container">
+        </div>
+        <span id="add-phenotype" class="glyphicon glyphicon-edit add-filter" aria-hiddne="true"></span>
+        <script>
+          createFilter("add-phenotype", "phenotype-select", "extra-phenotypes", ["value1", "value1", "value1", "value1", "value1", "value1"])
+        </script>-->
+        <hr />
+        <label for="hallmark">Bicluster Hallmark</label>
+        <select id="hallmark" name="hallmark" class="form-control">
+          {% for hallmark in hallmarks %}
+            <option value="{{ hallmark[1] }}">{{ hallmark[0] }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </form>
+  </div>
+  <div class='search-examples'>
+    (Examples: somatic mutation = <a href='/gene/NF2'>NF2</a>, regulator = <a href='/gene/E2F1'>E2F1</a> or <a href='/mirna/hsa-mir-29a-3p '>hsa-mir-29a-3p</a>, and gene in bicluster = <a href='/gene/ABO'>ABO</a>)
+  </div>
 </div>
+<!-- we do not have a 'Combinatorial Regulatory Network' for MPM yet
 <div class='text-center bs-callout bs-callout-default'>
   <h4>
     Explore Combinatorial Regulatory Network for MPM:
@@ -46,4 +91,5 @@
   </center>
   <a href='/combinatorial_network'><img class='displayed' alt='mpmSYGNAL Transcriptional Regulaotry Network' src='/static/images/combNet.gif'></a>
 </div>
+-->
 {% endblock %}
