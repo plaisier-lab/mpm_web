@@ -277,6 +277,7 @@ CREATE TABLE bicluster_phenotype_significance (
     bicluster_id integer unsigned,
     phenotype_id integer unsigned,
     p_value float,
+    r_value float,
 
     PRIMARY KEY (id),
     FOREIGN KEY (bicluster_id) REFERENCES bicluster (id),

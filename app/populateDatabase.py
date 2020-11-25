@@ -1096,6 +1096,7 @@ for bicluster in biclusters.values():
                 BiclusterPhenotypeSignificance(
                     bicluster_id = bicluster.id,
                     phenotype_id = phenotype.id,
+                    r_value = found_stats[0],
                     p_value = found_stats[1],
                 )
             )
