@@ -722,51 +722,15 @@ def bicluster_causal_analysis(mutation=None, regulator=None, bicluster=None, phe
         eigengene_data_by_patient[datum[2]] = (datum[0], datum[1])
     
     js_scatterplot_data = {}
-    if phenotype_min_max == None:
-        for phenotype in PHENOTYPES_DICT[phenotype_name]:
-            js_scatterplot_data[phenotype] = {}
-            
-            js_scatterplot_data[phenotype][0] = {
-                "name": "{} (Mut)".format(phenotype),
-                "data": [],
-                "color": GRAPH_COLOR_MAP[phenotype],
-                "marker": {
-                    "symbol": "circle",
-                    "radius": 3,
-                },
-            }
+    js_scatterplot_data[0] = {
+        "name": "Mutated",
+        "data": [],
+    }
 
-            js_scatterplot_data[phenotype][1] = {
-                "name": "{} (WT)".format(phenotype),
-                "data": [],
-                "color": GRAPH_COLOR_MAP[phenotype],
-                "marker": {
-                    "symbol": "cross",
-                    "lineColor": None,
-                    "lineWidth": 2,
-                },
-            }
-    else:
-        js_scatterplot_data[0] = {
-            "name": "Mutated",
-            "data": [],
-            "color": GRAPH_COLOR_GRADIENTS[phenotype_name][1],
-            "marker": {
-                "symbol": "circle",
-                "radius": 3,
-            },
-        }
-
-        js_scatterplot_data[1] = {
-            "name": "WT",
-            "data": [],
-            "color": GRAPH_COLOR_GRADIENTS[phenotype_name][1],
-            "marker": {
-                "symbol": "cross",
-                "lineColor": None,
-                "lineWidth": 2,
-            },
-        }
+    js_scatterplot_data[1] = {
+        "name": "WT",
+        "data": [],
+    }
 
     use_table = gene_expression_data_by_patient
     if len(eigengene_data) < len(gene_expression_data):
@@ -792,19 +756,20 @@ def bicluster_causal_analysis(mutation=None, regulator=None, bicluster=None, phe
         boolean = eigengene_data_by_patient[patient][1]
 
         if phenotype_min_max == None:
-            if string_by_patient[patient] not in js_scatterplot_data:
-                continue
-            
-            js_scatterplot_data[string_by_patient[patient]][boolean]["data"].append({
+            js_scatterplot_data[boolean]["data"].append({
                 "x": x,
                 "y": y,
+                "phenotype": string_by_patient[patient],
                 "name": patient,
+                "color": GRAPH_COLOR_MAP[string_by_patient[patient]],
             })
         else:
             js_scatterplot_data[boolean]["data"].append({
                 "x": x,
                 "y": y,
-                "name": patient + " - " + PHENOTYPE_INDEX_TO_UINAME[phenotype_name] + ": " + "{:.2f}".format(value_by_patient[patient]),
+                "z": value_by_patient[patient],
+                "phenotype": PHENOTYPE_INDEX_TO_UINAME[phenotype_name],
+                "name": patient,
                 "color": get_phenotype_color(phenotype_name, value_by_patient[patient], phenotype_min_max),
             })
 
@@ -819,13 +784,8 @@ def bicluster_causal_analysis(mutation=None, regulator=None, bicluster=None, phe
     js_scatterplot_stats = stats.pearsonr([i[0] for i in all_data], [i[1] for i in all_data])
 
     js_scatterplot_data_array = []
-    if phenotype_min_max == None:
-        for phenotype in js_scatterplot_data.keys():
-            js_scatterplot_data_array.append(js_scatterplot_data[phenotype][1])
-            js_scatterplot_data_array.append(js_scatterplot_data[phenotype][0])
-    else:
-        js_scatterplot_data_array.append(js_scatterplot_data[0])
-        js_scatterplot_data_array.append(js_scatterplot_data[1])
+    js_scatterplot_data_array.append(js_scatterplot_data[0])
+    js_scatterplot_data_array.append(js_scatterplot_data[1])
 
     return json.dumps({
         "mutation_gene_expression": {

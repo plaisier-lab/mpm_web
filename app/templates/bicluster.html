@@ -7,12 +7,29 @@
     <script src="https://code.highcharts.com/highcharts.js"></script>
     <script src="https://code.highcharts.com/modules/exporting.js"></script>
     <script src="https://code.highcharts.com/highcharts-more.js"></script>
+    <script src="https://d3js.org/d3.v4.js"></script>
 
     <script src="/static/js/dagre.min.js"></script>
     <script src="/static/js/cytoscape.min.js"></script>
     <script src="/static/js/cytoscape-dagre.js"></script>
+    <script src="/static/js/saveSvgAsPng.js"></script>2
+    <script src="/static/js/causal-flow.js"></script>
 
     <style>
+      .causal-flow-tooltip {
+				display: inline-block;
+				border-radius: 2px;
+				border: 1px solid black;
+				background-color: #EEE;
+				padding: 0.3em;
+				position: fixed;
+				top: -1000px;
+				left: -1000px;
+				opacity: 0;
+				transform: translate(10px, -50%);
+        z-index: 10000;
+			}
+
       #regulation-graph {
         width: 100%;
         height: 300px;
@@ -69,7 +86,7 @@
       Highcharts.SVGRenderer.prototype.symbols.cross = function (x, y, w, h) {
         return ['M', x, y, 'L', x + w / 1.5, y + h / 1.5, 'M', x + w / 1.5, y, 'L', x, y + h / 1.5, 'z'];
       }
-      
+
       function plotCausal(mutation, regulator, bicluster) {
         document.getElementById("expressions-name").innerHTML = `${mutation}&nbsp;<span>🡒</span>&nbsp;${regulator}&nbsp;<span>🡒</span>&nbsp;${bicluster}`
         let phenotype = document.getElementById("causal-phenotype-select").value
@@ -954,13 +971,13 @@
 
 <!-- Modal -->
 <div class="modal fade" id="expressions-modal" tabindex="-1" role="dialog" aria-labelledby="expressions-modal-label">
-  <div class="modal-dialog modal-lg" role="document">
+  <div class="modal-dialog modal-lg" role="document" style="width: fit-content; padding: 2em;">
     <div class="modal-content">
       <div class="modal-header">
         <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
         <h4 class="modal-title" id="myModalLabel">Causal Flow&nbsp;<div id="expressions-name" style="display: inline;"></div></h4>
       </div>
-      <div class="modal-body">
+      <div class="modal-body" style="padding: 2em;">
         <center>
           <div class="form-group" style="width: 200px;">
             <label for="causal-phenotype-select">Phenotype</label>
@@ -969,10 +986,11 @@
                 <option value="{{ phenotype[1] }}">{{ phenotype[0] }}</option>
               {% endfor %}
             </select>
+            <button id="save-causal-flow" class="btn btn-primary btn-small" style="width: 100%; margin-top: 5px;">Save Image</button>
           </div>
         </center>
         
-        <div class="causal-flow-charts">
+        <!--<div class="causal-flow-charts">
           <div>
             <div id="gene-expression-stats"></div>
             <div id="gene-expression-boxplot" style="width: 350px; height: 300px; display: inline-block;"></div>
@@ -989,11 +1007,14 @@
             <div id="residual-stats"></div>
             <div id="residual-boxplot" style="width: 350px; height: 300px; display: inline-block;"></div>
           </div>
-        </div>
+        </div>-->
+        <div id="causal-flow"></div>
       </div>
     </div>
   </div>
 </div>
+
+<div id="causal-flow-tooltip" class="causal-flow-tooltip"></div>
 
 <script>
   let elements = document.getElementsByClassName("expression-viewer");
@@ -1006,12 +1027,16 @@
       causalMutation = element.attributes["mutation"].value
       causalRegulator = element.attributes["regulator"].value
       causalBicluster = element.attributes["bicluster"].value
-      plotCausal(causalMutation, causalRegulator, causalBicluster)
+      // plotCausal(causalMutation, causalRegulator, causalBicluster)
+
+      loadCausalFlow(causalMutation, causalRegulator, causalBicluster, document.getElementById("causal-phenotype-select").value)
     })
   }
 
   document.getElementById("causal-phenotype-select").addEventListener("change", (event) => {
-    plotCausal(causalMutation, causalRegulator, causalBicluster)
+    // plotCausal(causalMutation, causalRegulator, causalBicluster)
+
+    loadCausalFlow(causalMutation, causalRegulator, causalBicluster, document.getElementById("causal-phenotype-select").value)
   })
 
   document.getElementById("phenotype-select").addEventListener("change", (event) => {
