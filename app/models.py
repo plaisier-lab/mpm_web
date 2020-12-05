@@ -326,6 +326,7 @@ class BiclusterPhenotypeSignificance(db.Model):
     bicluster_id = db.Column(db.ForeignKey('bicluster.id'), index=True)
     phenotype_id = db.Column(db.ForeignKey('phenotype.id'), index=True)
     p_value = db.Column(db.Float)
+    r_value = db.Column(db.Float)
 
     bicluster = db.relationship('Bicluster', primaryjoin='BiclusterPhenotypeSignificance.bicluster_id == Bicluster.id', backref='bicluster_phenotype_significance')
     phenotype = db.relationship('Phenotype', primaryjoin='BiclusterPhenotypeSignificance.phenotype_id == Phenotype.id', backref='bicluster_phenotype_significance')
