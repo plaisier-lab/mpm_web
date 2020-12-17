@@ -66,11 +66,7 @@
         </script>-->
         <hr />
         <label for="hallmark">Bicluster Hallmark</label>
-        <select id="hallmark" name="hallmark" class="form-control">
-          {% for hallmark in hallmarks %}
-            <option value="{{ hallmark[1] }}">{{ hallmark[0] }}</option>
-          {% endfor %}
-        </select>
+        <input id="hallmark" name="hallmark" type="hidden" />
         <div id="hallmark-container" class="hallmark-container">
           <img src="/static/images/hallmarks.png" />
         </div>

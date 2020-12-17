@@ -40,6 +40,7 @@ import itertools
 import gzip
 import pandas
 import numpy as np
+import base64
 from sklearn.linear_model import LinearRegression
 # import rpy2.robjects as robjects
 from scipy import stats
@@ -52,16 +53,16 @@ convert = {'Evading apoptosis': 'cellDeath.gif', 'Evading immune detection': 'av
     'Reprogramming energy metabolism': 'cellularEnergetics.gif', 'Self sufficiency in growth signals': 'sustainedProliferativeSignalling.gif', 'Sustained angiogenesis': 'angiogenesis.gif', 'Tissue invasion and metastasis': 'invasion.gif', 'Tumor promoting inflammation': 'promotingInflammation.gif'}
 
 HALLMARKS = [
-    'Evading apoptosis',
-    'Evading immune detection',
-    'Genome instability and mutation',
-    'Insensitivity to antigrowth signals',
-    'Limitless replicative potential',
-    'Reprogramming energy metabolism',
     'Self sufficiency in growth signals',
+    'Reprogramming energy metabolism',
+    'Evading apoptosis',
+    'Genome instability and mutation',
     'Sustained angiogenesis',
     'Tissue invasion and metastasis',
     'Tumor promoting inflammation',
+    'Limitless replicative potential',
+    'Evading immune detection',
+    'Insensitivity to antigrowth signals',
 ]
 
 print(os.getcwd())
@@ -545,7 +546,7 @@ def get_index_locals():
 @app.route('/')
 def index():
     hallmarks, selectable_phenotypes = get_index_locals()
-    return render_template('index.html', hallmarks = hallmarks, selectable_phenotypes = selectable_phenotypes)
+    return render_template('index.html', hallmarks=hallmarks, selectable_phenotypes=selectable_phenotypes)
 
 @app.route('/bicluster-causal-analysis/<mutation>/<regulator>/<bicluster>/<phenotype_name>')
 # mutation and regulator are gene symbol names, bicluster is the bicluster name
@@ -1215,8 +1216,19 @@ def __get_muts(c, gene_pk, symbol, hallmark_filter=None):
                     [cf1[4]]
                 )
                 tmp1 = [i[0] for i in c.fetchall()]
+                
+                has_hallmark = True
+                if hallmark_filter != None and len(hallmark_filter) > 0:
+                    has_hallmark = False
+                    
+                    # make sure tmp1 has at least one element in hallmark_filter
+                    for name in tmp1:
+                        index = HALLMARKS.index(name) + 1
+                        if index in hallmark_filter:
+                            has_hallmark = True
+                            break
 
-                if hallmark_filter == None or hallmark_filter in tmp1:
+                if has_hallmark:
                     h1 = list(set([convert[i] for i in tmp1]))
                     h2 = [(i,convert[i]) for i in tmp1]
                     muts['data'].append([symbol, g1, b1[0], b1[1], b1[2], h2])
@@ -1244,8 +1256,19 @@ def __get_regulators(c, symbol, bme_type, hallmark_filter=None):
                       [reg[1]])
             tmp1 = [i[0] for i in c.fetchall()]
 
+            has_hallmark = True
+            if hallmark_filter != None and len(hallmark_filter) > 0:
+                has_hallmark = False
+                
+                # make sure tmp1 has at least one element in hallmark_filter
+                for name in tmp1:
+                    index = HALLMARKS.index(name) + 1
+                    if index in hallmark_filter:
+                        has_hallmark = True
+                        break
+
             # filter hallmarks using advanced search parameters
-            if hallmark_filter == None or hallmark_filter in tmp1:
+            if has_hallmark:
                 h1 = list(set([convert[i] for i in tmp1]))
                 h2 = [(i,convert[i]) for i in tmp1]
                 regs['data'].append([symbol, action, b1[0], b1[1], b1[2], h2])
@@ -1275,15 +1298,32 @@ def gene(symbol=None, defaults={'symbol': None}):
     phenotype = phenotype if phenotype else None
     hallmark = request.args.get('hallmark')
     hallmark = hallmark if hallmark else None
+
+    # decode the hallmark
+    hallmarks = []
+    if hallmark:
+        hallmarks = json.loads(base64.b64decode(hallmark))
+
+        # verify hallmarks
+        if type(hallmarks) != list:
+            hallmarks = []
+        
+        verified = True
+        for number in hallmarks:
+            if type(number) != int:
+                verified = False
+
+        if not verified:
+            hallmarks = []
     
     db = dbconn()
     c = db.cursor()
     c.execute("""SELECT id FROM gene WHERE symbol=%s""", [symbol])
     gene_pk = c.fetchone()[0]
-    muts = __get_muts(c, gene_pk, symbol, hallmark_filter=hallmark)
+    muts = __get_muts(c, gene_pk, symbol, hallmark_filter=hallmarks)
 
     c.execute("""SELECT * FROM tf_regulator WHERE tf_id=%s""", [gene_pk])
-    regs = __get_regulators(c, symbol, "gene", hallmark_filter=hallmark)
+    regs = __get_regulators(c, symbol, "gene", hallmark_filter=hallmarks)
 
     # Get biclusters that gene resides
     bics = {}

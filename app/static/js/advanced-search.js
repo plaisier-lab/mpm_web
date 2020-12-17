@@ -34,8 +34,22 @@ function createFilter(buttonId, selectId, containerId, options) {
 	}
 }
 
+const idToName = {
+	1: "Self sufficiency in growth signals",
+	2: "Reprogramming energy metabolism",
+	3: "Evading apoptosis",
+	4: "Genome instability and mutation",
+	5: "Sustained angiogenesis",
+	6: "Tissue invasion and metastasis",
+	7: "Tumor promoting inflammation",
+	8: "Limitless replicative potential",
+	9: "Evading immune detection",
+	10: "Insensitivity to antigrowth signals",
+}
+
 const contexts = new Set()
 const activeContexts = new Set()
+const indexToName = {}
 function addHallmarkImage(index, grayscale, context) {
 	let width = 300, height = 274
 	if(!context) {
@@ -63,6 +77,7 @@ function addHallmarkImage(index, grayscale, context) {
 	}
 }
 
+const selectedHallmarkNames = []
 function onHallmarkClick(event) {
 	let foundContext
 	for(let context of contexts) {
@@ -75,12 +90,16 @@ function onHallmarkClick(event) {
 	if(foundContext) {
 		addHallmarkImage(foundContext.imageSource, activeContexts.has(foundContext), foundContext)
 
-		if(activeContexts.has(foundContext)) {
+		if(activeContexts.has(foundContext)) { // we've deselected the hallmark
 			activeContexts.delete(foundContext)
+			selectedHallmarkNames.splice(selectedHallmarkNames.indexOf(foundContext.imageSource), 1)
 		}
-		else {
+		else { // we've selected the hallmark
 			activeContexts.add(foundContext)
+			selectedHallmarkNames.push(foundContext.imageSource)
 		}
+
+		document.getElementById("hallmark").value = btoa(JSON.stringify(selectedHallmarkNames))
 	}
 }
 
