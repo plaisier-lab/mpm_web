@@ -805,7 +805,7 @@ def read_eigengenes(filename, prefix):
 biclusters = {}
 tf_regulators_dict = {}
 mirna_regulators_dict = {}
-with open('data/postProcessed_clustersOfBiclusters_CNA_CNVkit.csv') as in_file:
+with open('data/postProcessed_clustersOfBiclusters_CNA_CNVkit_11202020_12112020.csv') as in_file:
     # we need to cache the values so we can create the classes in order. we need to do this so the database can automatically complete the relationships defined in models.py
     bic_gene_values = []
     bic_go_values = []
@@ -1033,13 +1033,13 @@ with open('data/postProcessed_clustersOfBiclusters_CNA_CNVkit.csv') as in_file:
 
 
 # handle somatic mutations and causal flows
-interpret_sif("./data/sifs/causalAndMechanistic_network_CNA_CNVkit_11_02_2020.sif")
-interpret_causality_summary("./data/causality_CNA_final_8_13_2019/causalitySummary_pita.csv", "pita")
-interpret_causality_summary("./data/causality_CNA_final_8_13_2019/causalitySummary_targetscan.csv", "targetscan")
-interpret_causality_summary("./data/causality_CNA_final_8_13_2019/causalitySummary_tfbs_db.csv", "tfbs_db")
-interpret_causality_summary("./data/causal_v9/summaryCausality_CNV_8_16_2019_0.3_0.05_cleanedUp.csv", None)
+interpret_sif("./data/sifs/causalAndMechanistic_network_CNA_CNVkit_11_20_2020_12112020.sif")
+interpret_causality_summary("./data/causality_CNA_final_8_13_2019/causalitySummary_pita_12112020.csv", "pita")
+interpret_causality_summary("./data/causality_CNA_final_8_13_2019/causalitySummary_targetscan_12112020.csv", "targetscan")
+interpret_causality_summary("./data/causality_CNA_final_8_13_2019/causalitySummary_tfbs_db_12112020.csv", "tfbs_db")
+interpret_causality_summary("./data/causal_v9/summaryCausality_CNV_11_1_2020_0.3_0.05_cleanedUp_12112020.csv", None)
 
-with open("./data/oncoMerged_MESO/oncoMerge_mergedMuts.csv") as file:
+with open("./data/oncoMerged_MESO/oncoMerge_mergedMuts_12112020.csv") as file:
     header = file.readline().split(',')[1:]
     for line in file:
         somatic_mutation = line.split(',')[0]
