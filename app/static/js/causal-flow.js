@@ -1,25 +1,28 @@
 function loadCausalFlow(mutationName, regulatorName, biclusterName, phenotypeName) {
 	// set the dimensions and margins of the graph
-	let margin = {
+	const margin = {
 		top: 40,
 		right: 40,
 		bottom: 40,
 		left: 40
 	}
-	let boxWidth = 400 - margin.left - margin.right
-	let boxHeight = 360 - margin.top - margin.bottom
+	const boxWidth = 400 - margin.left - margin.right
+	const boxHeight = 360 - margin.top - margin.bottom
 
-	let width = 1170
-	let height = 750
+	const width = 1170
+	const height = 750
+
+	const legendTextHeight = 20
 
 	d3.select("#causal-flow svg").remove()
 
 	document.getElementById("save-causal-flow").addEventListener("click", event => {
 		saveSvgAsPng(document.getElementById("causal-flow-svg"), `${mutationName}-${regulatorName}-${biclusterName}.png`)
+		saveSvg(document.getElementById("causal-flow-svg"), `${mutationName}-${regulatorName}-${biclusterName}.svg`)
 	})
 
 	// append the svg object to the body of the page
-	let main = d3.select("#causal-flow")
+	const main = d3.select("#causal-flow")
 		.append("svg")
 		.attr("id", "causal-flow-svg")
 		.attr("width", width)
@@ -27,12 +30,15 @@ function loadCausalFlow(mutationName, regulatorName, biclusterName, phenotypeNam
 		.style("background-color", "#FFF")
 
 	let xAxisCount = 0, yAxisCount = 0
-	let tooltip = d3.select("#causal-flow-tooltip")
+	const tooltip = d3.select("#causal-flow-tooltip")
 
 	d3.json(`/bicluster-causal-analysis/${mutationName}/${regulatorName}/${biclusterName}/${phenotypeName}`, (json) => {
+		main.attr("width", width)
+			.attr("height", 750 + 40 + Math.ceil(json.scatter.legend.length / 2) * legendTextHeight) // adjust SVG height based off of legend
+		
 		// scatterplot
-		let drawScatterplot = (left, top) => {
-			let svg = main.append("g")
+		const drawScatterplot = (left, top) => {
+			const svg = main.append("g")
 				.attr("transform", `translate(${margin.left + left}, ${margin.top + top})`)
 			
 			// stats text
@@ -67,8 +73,8 @@ function loadCausalFlow(mutationName, regulatorName, biclusterName, phenotypeNam
 			
 			// find min/max on each axis
 			let minX = Number.MAX_VALUE, maxX = Number.MIN_VALUE, minY = Number.MAX_VALUE, maxY = Number.MIN_VALUE
-			for (let datum of json.scatter.data) {
-				for (let point of datum.data) {
+			for (const datum of json.scatter.data) {
+				for (const point of datum.data) {
 					minX = Math.min(minX, point.x)
 					maxX = Math.max(maxX, point.x)
 					minY = Math.min(minY, point.y)
@@ -77,8 +83,8 @@ function loadCausalFlow(mutationName, regulatorName, biclusterName, phenotypeNam
 			}
 
 			// x-axis
-			let xMargin = (maxX - minX) * 0.05
-			let x = d3.scaleLinear()
+			const xMargin = (maxX - minX) * 0.05
+			const x = d3.scaleLinear()
 				.domain([minX - xMargin, maxX + xMargin])
 				.range([0, boxWidth])
 
@@ -98,8 +104,8 @@ function loadCausalFlow(mutationName, regulatorName, biclusterName, phenotypeNam
 				.style("font-size", "10pt")
 
 			// y-axis
-			let yMargin = (maxY - minY) * 0.05
-			let y = d3.scaleLinear()
+			const yMargin = (maxY - minY) * 0.05
+			const y = d3.scaleLinear()
 				.domain([minY - yMargin, maxY + yMargin])
 				.range([boxHeight, 0])
 
@@ -127,7 +133,7 @@ function loadCausalFlow(mutationName, regulatorName, biclusterName, phenotypeNam
 				.attr("y2", y(json.scatter.regression[1][1]))
 
 			// add dots for mutation
-			let nodes = svg.append("g")
+			const nodes = svg.append("g")
 				.selectAll("dot")
 				.data(json.scatter.data[0].data)
 				.enter()
@@ -231,13 +237,46 @@ function loadCausalFlow(mutationName, regulatorName, biclusterName, phenotypeNam
 				.style("stroke", "#000")
 				.style("fill", "none")
 				.style("stroke-width", "2px")
+
+			// draw legend
+			const colorDomain = d3.scaleLinear().range(
+				json.scatter.legend.map(
+					value => value.color
+				)
+			).domain(
+				json.scatter.legend.map(
+					value => json.scatter.legend.indexOf(value) + 1
+				)
+			)
+
+			const legend = main.append("g")
+				.attr("transform", `translate(${margin.left + left}, ${margin.top + top + boxHeight + 60})`)
+				.attr("width", boxWidth)
+				.attr("height", Math.ceil(json.scatter.legend.length / 2) * legendTextHeight)
+				.selectAll("g")
+				.data(colorDomain.domain().slice())
+				.enter()
+				.append("g")
+				.attr("transform", (d, i) => `translate(${(i % 2) * boxWidth / 2}, ${Math.floor(i / 2) * legendTextHeight})`)
+			
+			legend.append("circle")
+				.attr("r", 5)
+				.style("fill", colorDomain)
+				.attr("transform", (d, i) => "translate(10, 10)")
+
+			legend.append("text")
+				.data(json.scatter.legend.map(value => value.name))
+				.attr("x", 20)
+				.attr("y", 10)
+				.attr("dy", ".35em")
+				.text(d => d)
 			
 			xAxisCount++
 			yAxisCount++
 		}
 
-		let drawBoxplot = (data, left, top, xAxisText, yAxisText) => {
-			let svg = main.append("g")
+		const drawBoxplot = (data, left, top, xAxisText, yAxisText) => {
+			const svg = main.append("g")
 				.attr("transform", `translate(${margin.left + left}, ${margin.top + top})`)
 
 			// stats text
@@ -262,7 +301,7 @@ function loadCausalFlow(mutationName, regulatorName, biclusterName, phenotypeNam
 			if(yAxisText instanceof Array) {
 				// y-axis text
 				for(let i = 0; i < yAxisText.length; i++) {
-					let text = yAxisText[i]
+					const text = yAxisText[i]
 					svg.append("text")
 						.attr("x", 0)
 						.attr("y", 0)
@@ -288,7 +327,7 @@ function loadCausalFlow(mutationName, regulatorName, biclusterName, phenotypeNam
 			}
 			
 			// x-axis
-			let x = d3.scaleBand()
+			const x = d3.scaleBand()
 				.range([0, boxWidth])
 				.domain(["WT", "Mutated"])
 				.paddingInner(1)
@@ -310,14 +349,14 @@ function loadCausalFlow(mutationName, regulatorName, biclusterName, phenotypeNam
 				.style("font-size", "11pt")
 			
 			let minY = Number.MAX_VALUE, maxY = Number.MIN_VALUE
-			for(let datum of data.data) {
+			for(const datum of data.data) {
 				minY = Math.min(minY, datum.low)
 				maxY = Math.max(maxY, datum.high)
 			}
 
 			// y-axis
-			let yMargin = (maxY - minY) * 0.05
-			let y = d3.scaleLinear()
+			const yMargin = (maxY - minY) * 0.05
+			const y = d3.scaleLinear()
 				.domain([minY - yMargin, maxY + yMargin])
 				.range([boxHeight, 0])
 
@@ -347,7 +386,7 @@ function loadCausalFlow(mutationName, regulatorName, biclusterName, phenotypeNam
 				.attr("stroke", "black")
 				.attr("stroke-width", "2px")
 
-			let length = 50
+			const length = 50
 			// max horizontal line
 			svg.selectAll("boxplot")
 				.data(data.data)
@@ -440,8 +479,8 @@ function loadCausalFlow(mutationName, regulatorName, biclusterName, phenotypeNam
 
 		// handle the middle decorations
 		{
-			let svg = main.append("g")
-			let top = 260
+			const svg = main.append("g")
+			const top = 260
 			
 			// mutation
 			svg.append("path")
@@ -478,7 +517,7 @@ function loadCausalFlow(mutationName, regulatorName, biclusterName, phenotypeNam
 				.text(regulatorName)
 			
 			// bicluster
-			let biclusterWidth = 80
+			const biclusterWidth = 80
 			svg.append("rect")
 				.attr("x", width / 2 - biclusterWidth / 2)
 				.attr("y", 254 + top)
@@ -635,7 +674,7 @@ function loadCausalFlow(mutationName, regulatorName, biclusterName, phenotypeNam
 				.style("transform", `translate(${width / 2 - 168}px, ${top - 75}px)`)
 			
 			// another line that goes somewhere
-			let lineLength = 17
+			const lineLength = 17
 			svg.append("line")
 				.attr("x1", width / 2 - 100)
 				.attr("y1", top + 90)

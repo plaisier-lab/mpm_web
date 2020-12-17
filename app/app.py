@@ -788,6 +788,24 @@ def bicluster_causal_analysis(mutation=None, regulator=None, bicluster=None, phe
     js_scatterplot_data_array.append(js_scatterplot_data[0])
     js_scatterplot_data_array.append(js_scatterplot_data[1])
 
+    js_scatterplot_legend = []
+    if phenotype_min_max == None:
+        for phenotype in PHENOTYPES_DICT[phenotype_name]:
+            js_scatterplot_legend.append({
+                "name": phenotype,
+                "color": GRAPH_COLOR_MAP[phenotype],
+            })
+    else:
+        js_scatterplot_legend.append({
+            "name": "Lowest Phenotype",
+            "color": GRAPH_COLOR_GRADIENTS[phenotype_name][0],
+        })
+
+        js_scatterplot_legend.append({
+            "name": "Highest Phenotype",
+            "color": GRAPH_COLOR_GRADIENTS[phenotype_name][1],
+        })
+
     return json.dumps({
         "mutation_gene_expression": {
             "data": js_mutation_gene_expression_data,
@@ -809,6 +827,7 @@ def bicluster_causal_analysis(mutation=None, regulator=None, bicluster=None, phe
         },
         "scatter": {
             "data": js_scatterplot_data_array,
+            "legend": js_scatterplot_legend,
             "stats": js_scatterplot_stats,
             "regression": [
                 [lowest_x, regression.coef_[0] * lowest_x + regression.intercept_],
