@@ -102,7 +102,7 @@
                                 <tbody>
                                     {% for reg1 in regs['data'] %}
                                     <tr>
-                                        <td>{{ reg1[0] }} ({{ reg1[1] }})</td><td><a href="{{url_for('bicluster', bicluster=reg1[2])}}">{{ reg1[2] | upper }}</a></td><td>{{ "%.2f" | format(reg1[3]) }} ({{ "%.1E" | format(reg1[4]) }})</td><td>{% for h1 in reg1[5] %}<img src='/static/images/{{ h1[1] }}' width='20' alt='{{ h1[0] }}' title='{{ h1[0] }}'>{% endfor %}</td>
+                                        <td>{{ reg1[0] }} ({{ reg1[1] }})</td><td><a href="{{url_for('bicluster_page.bicluster', bicluster=reg1[2])}}">{{ reg1[2] | upper }}</a></td><td>{{ "%.2f" | format(reg1[3]) }} ({{ "%.1E" | format(reg1[4]) }})</td><td>{% for h1 in reg1[5] %}<img src='/static/images/{{ h1[1] }}' width='20' alt='{{ h1[0] }}' title='{{ h1[0] }}'>{% endfor %}</td>
                                     </tr>
                                     {% endfor %}
                                 </tbody>
@@ -116,7 +116,7 @@
                             <h4>Biclusters containing {{ gene }}: <span class="glyphicon glyphicon-info-sign" data-toggle='collapse' data-target='#bic' style='color:#f00;font-size=10pt;'></span></h4>
                             <div id='bic' class='collapse' style='text-align:justify;'>List of biclusters that contain the genes that was searched. Var. Exp. FPC is the variance explained by the first principal component and is a good measure of bicluster co-expression. Survival is the Cox proportional hazards regression of the bicluster eigengene versus paitent survival. Hallmark(s) is the hallmarks of cancer associated with the bicluster genes. Legend for hallmarks:<br><center><img src='/static/images/legend.jpg' alt='Hallmarks of Cancer' width=300><br><small><a href='http://www.ncbi.nlm.nih.gov/pubmed/21376230'>Hanahan and Weinberg, Cell 2011</a></small></center></div>
 
-                            {% if bics['biclusters'] > 0 %}
+                            {% if 'biclusters' in bics and bics['biclusters'] > 0 %}
                             <table class='table table-bordered table-striped text-center'>
                                 <tr>
                                     <th class='text-center'>Gene</th><th class='text-center'>Biclusters</th>
@@ -134,7 +134,7 @@
                                 <tbody>
                                     {% for bic1 in bics['data'] %}
                                     <tr>
-                                        <td><a href="{{url_for('bicluster', bicluster=bic1[0])}}">{{ bic1[0] | upper }}</a></td><td>{{ bic1[1] }} ({{ bic1[2] }})</td><td>{{ bic1[3] }} ({{ bic1[4] }})</td><td>{% for h1 in bic1[5] %}<img src='/static/images/{{ h1[1] }}' width='20' alt='{{ h1[0] }}' title='{{ h1[0] }}'>{% endfor %}</td>
+                                        <td><a href="{{url_for('bicluster_page.bicluster', bicluster=bic1[0])}}">{{ bic1[0] | upper }}</a></td><td>{{ bic1[1] }} ({{ bic1[2] }})</td><td>{{ bic1[3] }} ({{ bic1[4] }})</td><td>{% for h1 in bic1[5] %}<img src='/static/images/{{ h1[1] }}' width='20' alt='{{ h1[0] }}' title='{{ h1[0] }}'>{% endfor %}</td>
                                     </tr>
                                     {% endfor %}
                                 </tbody>
