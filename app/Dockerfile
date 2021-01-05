@@ -7,12 +7,10 @@ WORKDIR /app
 COPY requirements.txt /app
 RUN pip install -r requirements.txt
 
-COPY app.py /app
-COPY models.py /app
-COPY populateDatabase.py /app
+COPY *.py /app/
 COPY templates /app/templates
 COPY static /app/static
 
 COPY data /app/data
 
-CMD python app.py
+CMD python __main__.py
