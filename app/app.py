@@ -31,7 +31,6 @@ import csv
 from functools import wraps
 
 # import MySQLdb
-import mysql.connector
 from flask import Flask, Response, url_for, redirect, render_template, request, session, flash, jsonify
 import flask
 
@@ -46,6 +45,7 @@ from sklearn.linear_model import LinearRegression
 from scipy import stats
 from colour import Color
 
+from database import dbconn
 
 NUM_PARTS = 5
 
@@ -73,38 +73,6 @@ app = Flask(__name__)
 ######################################################################
 # General helpers
 ######################################################################
-
-
-def dbconn():
-    '''
-    'user': app.config['USER'],
-    'password': app.config['PASS'],
-    'host': app.config['HOST'],
-    'port': app.config['port'],
-    'database': app.config['DB'],
-    '''
-
-    '''
-    'user': "root",
-    'password': "root",
-    'host': "db",
-    'port': "3306",
-    'database': "mpm_web",
-    '''
-
-    config = {
-        'user': "root",
-        'password': "root",
-        'host': "db",
-        'port': "3306",
-        'database': "mpm_web",
-    }
-    return mysql.connector.connect(**config)
-
-
-def read_exps():
-    with gzip.open(app.config['GENE_EXPR_FILE'], 'rb') as f:
-        return pandas.read_csv(f, sep=',', index_col=0, header=0)
 
 ######################################################################
 # Graph/Visualization functionality
