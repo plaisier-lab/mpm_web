@@ -20,29 +20,13 @@ from __future__ import print_function
 ## mention who built it. Thanks. :-)                    ##
 ##########################################################
 
-#!/usr/bin/env python
-import sys
-import traceback as tb
 import logging
 import json
-import os
-from os import path, walk
 import csv
-from functools import wraps
 
-# import MySQLdb
-from flask import Flask, Response, url_for, redirect, render_template, request, session, flash, jsonify
-import flask
+from flask import Flask, Response, render_template, request
 
-import math
-import gzip
-import pandas
-import numpy as np
-from sklearn.linear_model import LinearRegression
-# import rpy2.robjects as robjects
-from scipy import stats
-
-from constants import NUM_PARTS, HALLMARK_TO_ICON, HALLMARKS, ENRICHMENT_PHENOTYPES, SEX_PHENOTYPES, PHENOTYPES_DICT, GRAPH_COLOR_MAP, GRAPH_COLOR_GRADIENTS, SELECTABLE_PHENOTYPES, SELECTABLE_PHENOTYPES_BLACKLIST, USE_PHENOTYPE_SCATTERPLOT, PHENOTYPE_INDEX_TO_UINAME
+from constants import HALLMARKS, SELECTABLE_PHENOTYPES, SELECTABLE_PHENOTYPES_BLACKLIST
 from database import dbconn
 from bicluster import bicluster_page
 from causal_analysis import causal_analysis_page
