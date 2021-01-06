@@ -982,7 +982,7 @@
           <div class="form-group" style="width: 200px;">
             <label for="causal-phenotype-select">Phenotype</label>
             <select id="causal-phenotype-select" class="form-control">
-              {% for phenotype in selectable_phenotypes %}
+              {% for phenotype in expression_selectable_phenotypes %}
                 <option value="{{ phenotype[1] }}">{{ phenotype[0] }}</option>
               {% endfor %}
             </select>

@@ -87,6 +87,7 @@ function loadCausalFlow(mutationName, regulatorName, biclusterName, phenotypeNam
 			const x = d3.scaleLinear()
 				.domain([minX - xMargin, maxX + xMargin])
 				.range([0, boxWidth])
+				.nice()
 
 			svg.append("g")
 				.attr("transform", "translate(0," + boxHeight + ")")
@@ -108,6 +109,7 @@ function loadCausalFlow(mutationName, regulatorName, biclusterName, phenotypeNam
 			const y = d3.scaleLinear()
 				.domain([minY - yMargin, maxY + yMargin])
 				.range([boxHeight, 0])
+				.nice()
 
 			svg.append("g")
 				.attr("class", `yAxis${yAxisCount}`)
@@ -359,6 +361,7 @@ function loadCausalFlow(mutationName, regulatorName, biclusterName, phenotypeNam
 			const y = d3.scaleLinear()
 				.domain([minY - yMargin, maxY + yMargin])
 				.range([boxHeight, 0])
+				.nice()
 
 			svg.append("g")
 				.attr("class", `yAxis${yAxisCount}`)
