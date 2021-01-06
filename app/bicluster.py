@@ -10,6 +10,8 @@ import json
 import math
 
 from database import dbconn
+from scipy import stats
+from sklearn.linear_model import LinearRegression
 
 from graph_common import cluster_data, subtype_enrichment
 from phenotype import get_phenotype_min_max, get_phenotype_color
