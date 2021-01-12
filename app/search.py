@@ -51,7 +51,7 @@ def search():
 		return redirect(url_for('.mirna', symbol=symbol) + query_statement)
 
 
-def __get_muts(c, gene_pk, symbol, hallmark_filter=None):
+def __get_muts(c, gene_pk, symbol, hallmark_search=None):
 	# Get causal flows downstream of mutation in gene
 	muts = {}
 	muts['name'] = symbol
@@ -92,34 +92,23 @@ def __get_muts(c, gene_pk, symbol, hallmark_filter=None):
 			# print the bicluster in the table
 			if not g1=='':
 				c.execute("""SELECT name, survival, survival_p_value FROM bicluster WHERE id=%s""", [cf1[4]])
-				b1 = c.fetchall()[0]
+				biclusters = c.fetchall()[0]
 				c.execute(
 					"SELECT hm.name FROM hallmark hm join bic_hal bh on hm.id=bh.hallmark_id  WHERE bh.bicluster_id=%s",
 					[cf1[4]]
 				)
-				tmp1 = [i[0] for i in c.fetchall()]
+				ordered_hallmarks = [i[0] for i in c.fetchall()]
 				
-				has_hallmark = True
-				if hallmark_filter != None and len(hallmark_filter) > 0:
-					has_hallmark = False
-					
-					# make sure tmp1 has at least one element in hallmark_filter
-					for name in tmp1:
-						index = HALLMARKS.index(name) + 1
-						if index in hallmark_filter:
-							has_hallmark = True
-							break
+				if has_hallmark_search(ordered_hallmarks, hallmark_search):
+					hallmark = [(i, HALLMARK_TO_ICON[i]) for i in ordered_hallmarks]
+					muts['data'].append([symbol, g1, biclusters[0], biclusters[1], biclusters[2], hallmark])
 
-				if has_hallmark:
-					h1 = [(i, HALLMARK_TO_ICON[i]) for i in tmp1]
-					muts['data'].append([symbol, g1, b1[0], b1[1], b1[2], h1])
-
-					if not b1 in muts['biclusters']:
-						muts['biclusters'].append(b1[0])
+					if biclusters[0] not in muts['biclusters']:
+						muts['biclusters'].append(biclusters[0])
 	return muts
 
 
-def __get_regulators(c, symbol, bme_type, hallmark_filter=None):
+def __get_regulators(c, symbol, bme_type, hallmark_search=None):
 	regs = {}
 	regs['name'] = symbol
 	regs['biclusters'] = 0
@@ -132,29 +121,30 @@ def __get_regulators(c, symbol, bme_type, hallmark_filter=None):
 			if bme_type =='gene' and reg[3] == 'activator':
 				action = 'Act.'
 			c.execute("""SELECT name, survival, survival_p_value FROM bicluster WHERE id=%s""", [reg[1]])
-			b1 = c.fetchall()[0]
-			c.execute("SELECT hm.name FROM hallmark hm join bic_hal bh on hm.id=bh.hallmark_id WHERE bh.bicluster_id=%s",
-					  [reg[1]])
-			tmp1 = [i[0] for i in c.fetchall()]
-
-			has_hallmark = True
-			if hallmark_filter != None and len(hallmark_filter) > 0:
-				has_hallmark = False
-				
-				# make sure tmp1 has at least one element in hallmark_filter
-				for name in tmp1:
-					index = HALLMARKS.index(name) + 1
-					if index in hallmark_filter:
-						has_hallmark = True
-						break
+			biclusters = c.fetchall()[0]
+			c.execute("SELECT hm.name FROM hallmark hm join bic_hal bh on hm.id=bh.hallmark_id WHERE bh.bicluster_id=%s", [reg[1]])
+			ordered_hallmarks = [i[0] for i in c.fetchall()]
 
 			# filter hallmarks using advanced search parameters
-			if has_hallmark:
-				h1 = [(i, HALLMARK_TO_ICON[i]) for i in tmp1]
-				regs['data'].append([symbol, action, b1[0], b1[1], b1[2], h1])
+			if has_hallmark_search(ordered_hallmarks, hallmark_search):
+				hallmark = [(i, HALLMARK_TO_ICON[i]) for i in ordered_hallmarks]
+				regs['data'].append([symbol, action, biclusters[0], biclusters[1], biclusters[2], hallmark])
 				regs['biclusters'] = regs['biclusters'] + 1
 	return regs
 
+def has_hallmark_search(ordered_hallmarks, hallmark_search):
+	has_hallmark = True # default to true if we have no hallmark search
+	if hallmark_search != None and len(hallmark_search) > 0:
+		has_hallmark = False
+
+		# make sure ordered_hallmarks has at least one element in the hallmark_search
+		for name in ordered_hallmarks:
+			index = HALLMARKS.index(name) + 1
+			if index in hallmark_search:
+				has_hallmark = True
+				break
+	
+	return has_hallmark
 
 @search_page.route('/mirna')
 @search_page.route('/mirna/<symbol>')
@@ -200,10 +190,10 @@ def gene(symbol=None, defaults={'symbol': None}):
 	c = db.cursor()
 	c.execute("""SELECT id FROM gene WHERE symbol=%s""", [symbol])
 	gene_pk = c.fetchone()[0]
-	muts = __get_muts(c, gene_pk, symbol, hallmark_filter=hallmarks)
+	muts = __get_muts(c, gene_pk, symbol, hallmark_search=hallmarks)
 
 	c.execute("""SELECT * FROM tf_regulator WHERE tf_id=%s""", [gene_pk])
-	regs = __get_regulators(c, symbol, "gene", hallmark_filter=hallmarks)
+	regs = __get_regulators(c, symbol, "gene", hallmark_search=hallmarks)
 
 	# Get biclusters that gene resides
 	bics = {}

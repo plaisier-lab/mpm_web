@@ -50,30 +50,45 @@ const idToName = {
 const contexts = new Set()
 const activeContexts = new Set()
 const indexToName = {}
+const indexToImage = {}
 function addHallmarkImage(index, grayscale, context) {
-	let width = 300, height = 274
-	if(!context) {
-		let container = document.getElementById("hallmark-container")
-		let canvas = document.createElement("canvas")
-		canvas.width = width
-		canvas.height = height
-		container.appendChild(canvas)
-		context = canvas.getContext("2d")
+	const render = () => {
+		let width = 300, height = 274
+		if(!context) {
+			let container = document.getElementById("hallmark-container")
+			let canvas = document.createElement("canvas")
+			canvas.width = width
+			canvas.height = height
+			container.appendChild(canvas)
+			context = canvas.getContext("2d")
+		}
+
+		if(grayscale) {
+			context.filter = "grayscale(100%) opacity(30%)"	
+		}
+		else {
+			context.filter = "none"
+		}
+
+		context.clearRect(0, 0, width, height)
+		context.drawImage(indexToImage[index], 0, 0, width, height)
+		context.imageSource = index
+
+		if(!contexts.has(context)) {
+			contexts.add(context)
+		}
 	}
 
-	if(grayscale) {
-		context.filter = "grayscale(100%) opacity(30%)"	
+	if(!indexToImage[index]) {
+		indexToImage[index] = new Image()
+		indexToImage[index].onload = () => {
+			render()
+		}
+		indexToImage[index].src = `/static/images/hallmark ${index}.png?${Math.floor(Math.random() * 10000)}`
+		console.log(indexToImage[index].src)
 	}
 	else {
-		context.filter = "none"
-	}
-
-	context.clearRect(0, 0, width, height)
-	context.drawImage(document.getElementById(`hallmark-${index}`), 0, 0, width, height)
-	context.imageSource = index
-
-	if(!contexts.has(context)) {
-		contexts.add(context)
+		render()
 	}
 }
 
@@ -105,16 +120,6 @@ function onHallmarkClick(event) {
 
 document.getElementById("hallmark-container").addEventListener("click", event => onHallmarkClick(event))
 
-let loadedImages = 0
-function loadHallmarkImage() {
-	loadedImages++
-	if(loadedImages == 10) {
-		for(let i = 1; i <= 10; i++) {
-			addHallmarkImage(i, true)
-		}
-	}
-}
-
 for(let i = 1; i <= 10; i++) {
-	$(`#hallmark-${i}`).load(() => loadHallmarkImage())
+	addHallmarkImage(i, true)
 }
