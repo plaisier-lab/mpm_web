@@ -1,27 +1,20 @@
 import mysql.connector
+import os
 
 def dbconn():
-	'''
-	'user': app.config['USER'],
-	'password': app.config['PASS'],
-	'host': app.config['HOST'],
-	'port': app.config['port'],
-	'database': app.config['DB'],
-	'''
-
-	'''
-	'user': "root",
-	'password': "root",
-	'host': "db",
-	'port': "3306",
-	'database': "mpm_web",
-	'''
-
+	host = "db"
+	if os.environ.get("MPM_WEB_SQL_HOST") != None:
+		host = os.environ.get("MPM_WEB_SQL_HOST")
+	
+	port = "3306"
+	if os.environ.get("MPM_WEB_SQL_PORT") != None:
+		port = os.environ.get("MPM_WEB_SQL_PORT")
+	
 	config = {
 		'user': "root",
 		'password': "root",
-		'host': "db",
-		'port': "3306",
+		'host': host,
+		'port': port,
 		'database': "mpm_web",
 	}
 	return mysql.connector.connect(**config)
