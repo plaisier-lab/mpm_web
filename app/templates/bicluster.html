@@ -989,25 +989,6 @@
             <button id="save-causal-flow" class="btn btn-primary btn-small" style="width: 100%; margin-top: 5px;">Save Image</button>
           </div>
         </center>
-        
-        <!--<div class="causal-flow-charts">
-          <div>
-            <div id="gene-expression-stats"></div>
-            <div id="gene-expression-boxplot" style="width: 350px; height: 300px; display: inline-block;"></div>
-          </div>
-          <div>
-            <div id="eigengene-stats"></div>
-            <div id="eigengene-boxplot" style="width: 350px; height: 300px; display: inline-block;"></div>
-          </div>
-          <div>
-            <div id="scatterplot-stats"></div>
-            <div id="scatterplot" style="width: 350px; height: 435px; display: inline-block;"></div>
-          </div>
-          <div>
-            <div id="residual-stats"></div>
-            <div id="residual-boxplot" style="width: 350px; height: 300px; display: inline-block;"></div>
-          </div>
-        </div>-->
         <div id="causal-flow"></div>
       </div>
     </div>
@@ -1027,15 +1008,11 @@
       causalMutation = element.attributes["mutation"].value
       causalRegulator = element.attributes["regulator"].value
       causalBicluster = element.attributes["bicluster"].value
-      // plotCausal(causalMutation, causalRegulator, causalBicluster)
-
       loadCausalFlow(causalMutation, causalRegulator, causalBicluster, document.getElementById("causal-phenotype-select").value)
     })
   }
 
   document.getElementById("causal-phenotype-select").addEventListener("change", (event) => {
-    // plotCausal(causalMutation, causalRegulator, causalBicluster)
-
     loadCausalFlow(causalMutation, causalRegulator, causalBicluster, document.getElementById("causal-phenotype-select").value)
   })
 

@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}Index{% endblock %}
+{% block scripts %}
+	<!-- Datatables JQuery table formatting and interface -->
+	<script type="text/javascript" src="https://cdn.datatables.net/t/dt/jq-2.2.0,dt-1.10.11/datatables.min.js"></script>
+	<link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/t/dt/jq-2.2.0,dt-1.10.11/datatables.min.css"/>
+
+	<!-- Javascript to modify tables -->
+	<script type="text/javascript">
+		jQuery.extend(jQuery.fn.dataTableExt.oSort, {
+			"non-empty-string-asc": function (str1, str2) {
+				if(str1 == "")
+					return 1
+				if(str2 == "")
+					return -1
+				return ((str1 < str2) ? -1 : ((str1 > str2) ? 1 : 0))
+			},
+			"non-empty-string-desc": function (str1, str2) {
+				if(str1 == "")
+					return 1
+				if(str2 == "")
+					return -1
+				return ((str1 < str2) ? 1 : ((str1 > str2) ? -1 : 0))
+			},
+		})
+
+		$(document).ready(function() {
+			$('#biclusters').DataTable({
+				columnDefs: [{
+					type: 'non-empty-string',
+					targets: 3
+				}],
+				order: [[2, "desc"]]
+			});
+		});
+	</script>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid" style="margin-top: 40px;"></div>
+<div class='text-center'>
+	<div class='bs-callout bs-callout-default'>
+		{% if biclusters and biclusters|length > 0 %}
+			{% if searched_hallmarks %}
+				<h4 style="display: flex; align-items: center; justify-content: center;">
+					<div style="margin-right: 5px;">Biclusters containing</div>
+					{% for hallmark in searched_hallmarks %}
+						<img src='/static/images/{{ hallmark[1] }}' width='20' alt='{{ hallmark[0] }}' title='{{ hallmark[0] }}'>
+					{% endfor %}
+				</h4>
+			{% endif %}
+			<table class='table table-bordered table-striped text-center'>
+			<tr>
+				<th class='text-center'>Biclusters</th>
+			</tr>
+			<tr>
+				<td>{{ biclusters|length }}</td>
+			</tr>
+			</table>
+			<table id='biclusters' class='table table-bordered text-center'>
+				<thead>
+					<tr>
+						<td>Bicluster</td>
+						<td>Var. Exp. FPC<br>(Perm. <i>p</i>-value)</td>
+						<td>Survival<br>(<i>p</i>-value)</td>
+						{% if biclusters[0]["data"]|length == 8 %}
+							<td>Correlation Coefficient<br>(<i>p</i>-value)</td>
+						{% endif %}
+						<td>Hallmark(s)</td>
+					</tr>
+				</thead>
+				<tbody>
+					{% for bicluster in biclusters %}
+						<tr>
+							<td>
+								<a href="{{url_for('bicluster_page.bicluster', bicluster=bicluster['data'][1])}}">{{ bicluster["data"][1]|upper }}</a>
+							</td>
+							<td>
+								{{ bicluster["data"][2] }} ({{ bicluster["data"][3] }})
+							</td>
+							<td>
+								{{ bicluster["data"][4] }} ({{ bicluster["data"][5] }})
+							</td>
+							{% if bicluster["data"]|length == 8 %}
+								<td>
+									{{ bicluster["data"][6] }} ({{ bicluster["data"][7] }})
+								</td>
+							{% endif %}
+							<td>
+								{% for hallmark in bicluster["hallmarks"] %}
+									<img src='/static/images/{{ hallmark[1] }}' width='20' alt='{{ hallmark[0] }}' title='{{ hallmark[0] }}'>
+								{% endfor %}
+							</td>
+						</tr>
+					{% endfor %}
+				</tbody>
+			</table>
+		{% else %}
+			<div class='bg-danger'>&nbsp;<br><p>Not in any biclusters.<br>&nbsp;</p></div>
+		{% endif %}
+	</div>
+</div>
+{% endblock %}
