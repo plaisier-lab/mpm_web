@@ -29,7 +29,7 @@
       brings up all the possbile matches. Then select the correct search term from the drop down list and click the
       Search button to find all the somatic mutations, regulators or bilcusters with that gene/miRNA.
     </div>
-    <form id="searchform" action="search" method="get">
+    <form id="searchform" action="search" method="get" autocomplete="off">
       <div style='display: flex;'>
         <input id="term" name="gene" type="search" size=35 style='width: 100%;'>
         <button type="submit" class="btn btn-danger" value="search" style='border-top-left-radius: 0px; border-bottom-left-radius: 0px;'>
@@ -58,12 +58,6 @@
             <option value="{{ phenotype[1] }}">{{ phenotype[0] }}</option>
           {% endfor %}
         </select>
-        <!--<div id="extra-phenotypes" class="filter-container">
-        </div>
-        <span id="add-phenotype" class="glyphicon glyphicon-edit add-filter" aria-hiddne="true"></span>
-        <script>
-          createFilter("add-phenotype", "phenotype-select", "extra-phenotypes", ["value1", "value1", "value1", "value1", "value1", "value1"])
-        </script>-->
         <hr />
         <label for="hallmark">Bicluster Hallmark</label>
         <input id="hallmark" name="hallmark" type="hidden" />
