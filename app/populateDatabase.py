@@ -47,6 +47,7 @@ from decimal import Decimal
 import pandas as pd
 import json
 import time
+import math
 
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
@@ -191,6 +192,7 @@ db.session.add(ed1)
 db.session.commit()
 
 # Load up gene expression data
+'''
 gene_expression_count = 0
 for patient1 in gexp1.columns:
     for gene1 in gexp1.index:
@@ -205,6 +207,7 @@ for patient1 in gexp1.columns:
             db.session.commit()
             gene_expression_count = 0
 db.session.commit()
+'''
 
 # Add hallmarks of Cancer
 hallmark_names = ['Sustained angiogenesis', 'Insensitivity to antigrowth signals', 'Evading apoptosis', 'Limitless replicative potential', 'Evading immune detection',
@@ -334,6 +337,7 @@ def hallmark_name_to_csv_key(hallmark):
     return output
 
 # load up TfTargets
+'''
 print("humanTFs_All.csv...")
 with open("data/humanTFs_All.csv") as in_file:
     in_file.readline()  # consume headers
@@ -452,6 +456,7 @@ def handle_miRNA_json(file_name, source_name):
 
 handle_miRNA_json("targetScan_miRNA_sets_entrez_hsa.json", "Target Scan")
 handle_miRNA_json("pita_miRNA_sets_entrez_hsa.json", "Pita")
+'''
 
 def parse_mutation_name(input):
     regex = re.compile(r"(X|x|)([0-9]+)_(.+)")
@@ -1033,6 +1038,7 @@ with open('data/postProcessed_clustersOfBiclusters_CNA_CNVkit_11202020_12112020.
 
 
 # handle somatic mutations and causal flows
+'''
 interpret_sif("./data/sifs/causalAndMechanistic_network_CNA_CNVkit_11_20_2020_12112020.sif")
 interpret_causality_summary("./data/causality_CNA_final_8_13_2019/causalitySummary_pita_12112020.csv", "pita")
 interpret_causality_summary("./data/causality_CNA_final_8_13_2019/causalitySummary_targetscan_12112020.csv", "targetscan")
@@ -1102,5 +1108,191 @@ for bicluster in biclusters.values():
             )
 
 db.session.commit()
+'''
+
+def interpret_jacks_results(results_file, std_file, p_value_file):
+    results_file = open(results_file, "r")
+    std_file = open(std_file, "r")
+    p_value_file = open(p_value_file, "r")
+
+    first_line = results_file.readline().split("\t")
+    cell_lines = []
+    # create cell lines
+    for index in range(1, len(first_line)):
+        element = first_line[index].strip()
+        cell_line = CellLine(
+            name=element,
+        )
+        cell_lines.append(cell_line)
+        db.session.add(cell_line)
+    
+    db.session.commit() # commit cell lines
+
+    results = {}
+
+    # handle results in results file
+    for line in results_file:
+        line = [i.strip() for i in line.split("\t")]
+        gene_name = line[0]
+
+        if gene_name not in symbol2entrez or int(symbol2entrez[gene_name]) not in genes:
+            print("could not find %s" % gene_name)
+            continue
+
+        # loop through the cell lines we found in the file
+        for index in range(1, len(line)):
+            value = float(line[index])
+            cell_line = cell_lines[index - 1]
+
+            if gene_name not in results:
+                results[gene_name] = {}
+
+            results[gene_name][cell_line] = GeneJACKSResult(
+                gene_id=genes[int(symbol2entrez[gene_name])].id,
+                cell_line_id=cell_line.id,
+                score=value,
+            )
+    
+    # handle the std file
+    std_file.readline() # absorb header
+    for line in std_file:
+        line = [i.strip() for i in line.split("\t")]
+        gene_name = line[0]
+
+        if gene_name not in symbol2entrez or int(symbol2entrez[gene_name]) not in genes:
+            continue
+
+        # loop through the cell lines we found in the file
+        for index in range(1, len(line)):
+            value = float(line[index])
+            cell_line = cell_lines[index - 1]
+            results[gene_name][cell_line].std = value
+    
+    # handle the p-value file
+    p_value_file.readline() # absorb header
+    for line in p_value_file:
+        line = [i.strip() for i in line.split("\t")]
+        gene_name = line[0]
+
+        if gene_name not in symbol2entrez or int(symbol2entrez[gene_name]) not in genes:
+            continue
+
+        # loop through the cell lines we found in the file
+        for index in range(1, len(line)):
+            value = float(line[index])
+            cell_line = cell_lines[index - 1]
+            results[gene_name][cell_line].p_value = value
+    
+    # commit the results
+    for cell_line_dict in results.values():
+        for data in cell_line_dict.values():
+            db.session.add(data)
+
+    db.session.commit()
+
+    results_file.close()
+    std_file.close()
+    p_value_file.close()
+
+    return cell_lines
+
+def interpret_grna_results(means_file, std_file, cell_lines=[]):
+    means_file = open(means_file, "r")
+    std_file = open(std_file, "r")
+
+    results = {}
+    grna = {}
+
+    # read through the means file
+    means_file.readline() # absorb header
+    for line in means_file:
+        line = [i.strip() for i in line.split("\t")]
+        grna_name = line[0]
+        gene_name = line[1]
+
+        if gene_name not in symbol2entrez or int(symbol2entrez[gene_name]) not in genes:
+            continue
+
+        # loop through the cell lines we found in the file
+        for index in range(2, len(line)):
+            value = float(line[index])
+            cell_line = cell_lines[index - 2]
+
+            if grna_name not in results:
+                results[grna_name] = {}
+            
+            if grna_name not in grna:
+                grna[grna_name] = GRNA(
+                    name=grna_name,
+                    gene_id=genes[int(symbol2entrez[gene_name])].id,
+                )
+            
+            results[grna_name][cell_line] = GRNAJACKSResult(
+                cell_line_id=cell_line.id,
+                grna=grna[grna_name],
+                mean=value,
+            )
+    
+    # read through the std file
+    std_file.readline() # absorb header
+    for line in std_file:
+        line = [i.strip() for i in line.split("\t")]
+        grna_name = line[0]
+        gene_name = line[1]
+
+        if gene_name not in symbol2entrez or int(symbol2entrez[gene_name]) not in genes:
+            continue
+    
+        # loop through the cell lines we found in the file
+        for index in range(2, len(line)):
+            value = float(line[index])
+            cell_line = cell_lines[index - 2]
+
+            if not math.isnan(value):
+                results[grna_name][cell_line].std = value
+    
+    # commit the results
+    for cell_line_dict in results.values():
+        for data in cell_line_dict.values():
+            db.session.add(data)
+
+    db.session.commit()
+
+    means_file.close()
+    std_file.close()
+
+def interpret_achilles_common_essential(file):
+    file = open(file, "r")
+
+    file.readline() # skip header
+    for line in file:
+        gene_name, entrez = line.strip().split(" ")
+
+        if gene_name not in symbol2entrez or int(symbol2entrez[gene_name]) not in genes:
+            continue
+        
+        db.session.add(AchillesCommonEssential(
+            gene_id=genes[int(symbol2entrez[gene_name])].id,
+        ))
+    
+    db.session.commit()
+
+    file.close()
+
+cell_lines = interpret_jacks_results(
+    "./data/jacks/MPM_6_1_20_gene_JACKS_results.txt",
+    "./data/jacks/MPM_6_1_20_gene_std_JACKS_results.txt",
+    "./data/jacks/MPM_6_1_20_gene_pval_JACKS_results.txt"
+)
+
+interpret_grna_results(
+    "./data/jacks/MPM_6_1_20_logfoldchange_means.txt",
+    "./data/jacks/MPM_6_1_20_logfoldchange_std.txt",
+    cell_lines=cell_lines
+)
+
+interpret_achilles_common_essential(
+    "./data/Achilles_common_essentials.csv"
+)
 
 print("program took {} seconds to complete".format(time.time() - start_time))

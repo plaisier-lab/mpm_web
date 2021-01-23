@@ -330,3 +330,51 @@ class BiclusterPhenotypeSignificance(db.Model):
 
     bicluster = db.relationship('Bicluster', primaryjoin='BiclusterPhenotypeSignificance.bicluster_id == Bicluster.id', backref='bicluster_phenotype_significance')
     phenotype = db.relationship('Phenotype', primaryjoin='BiclusterPhenotypeSignificance.phenotype_id == Phenotype.id', backref='bicluster_phenotype_significance')
+
+class CellLine(db.Model):
+    __tablename__ = 'cell_line'
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(10))
+
+class GeneJACKSResult(db.Model):
+    __tablename__ = 'gene_jacks_result'
+
+    id = db.Column(db.Integer, primary_key=True)
+    gene_id = db.Column(db.ForeignKey('gene.id'), index=True)
+    cell_line_id = db.Column(db.ForeignKey('cell_line.id'), index=True)
+    score = db.Column(db.Float)
+    std = db.Column(db.Float)
+    p_value = db.Column(db.Float)
+
+    gene = db.relationship('Gene', primaryjoin='GeneJACKSResult.gene_id == Gene.id', backref='gene_jacks_result')
+    cell_line = db.relationship('CellLine', primaryjoin='GeneJACKSResult.cell_line_id == CellLine.id', backref='gene_jacks_result')
+
+class GRNA(db.Model):
+    __tablename__ = 'grna'
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(30))
+    gene_id = db.Column(db.ForeignKey('gene.id'), index=True)
+
+    gene = db.relationship('Gene', primaryjoin='GRNA.gene_id == Gene.id', backref='grna')
+
+class GRNAJACKSResult(db.Model):
+    __tablename__ = 'grna_jacks_result'
+
+    id = db.Column(db.Integer, primary_key=True)
+    grna_id = db.Column(db.ForeignKey('grna.id'), index=True)
+    cell_line_id = db.Column(db.ForeignKey('cell_line.id'), index=True)
+    mean = db.Column(db.Float)
+    std = db.Column(db.Float)
+
+    grna = db.relationship('GRNA', primaryjoin='GRNAJACKSResult.grna_id == GRNA.id', backref='grna_jacks_result')
+    cell_line = db.relationship('CellLine', primaryjoin='GRNAJACKSResult.cell_line_id == CellLine.id', backref='grna_jacks_result')
+
+class AchillesCommonEssential(db.Model):
+    __tablename__ = 'achilles_common_essential'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    gene_id = db.Column(db.ForeignKey('gene.id'), index=True)
+
+    gene = db.relationship('Gene', primaryjoin='AchillesCommonEssential.gene_id == Gene.id', backref='achilles_common_essential')

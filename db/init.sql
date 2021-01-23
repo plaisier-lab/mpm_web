@@ -283,3 +283,52 @@ CREATE TABLE bicluster_phenotype_significance (
     FOREIGN KEY (bicluster_id) REFERENCES bicluster (id),
     FOREIGN KEY (phenotype_id) REFERENCES phenotype (id)
 );
+
+CREATE TABLE cell_line (
+    id integer unsigned NOT NULL AUTO_INCREMENT,
+    name varchar(10),
+
+    PRIMARY KEY (id)
+);
+
+CREATE TABLE grna (
+    id integer unsigned NOT NULL AUTO_INCREMENT,
+    name varchar(30),
+    gene_id integer unsigned,
+
+    PRIMARY KEY (id),
+    FOREIGN KEY (gene_id) REFERENCES gene (id)
+);
+
+CREATE TABLE grna_jacks_result (
+    id integer unsigned NOT NULL AUTO_INCREMENT,
+    cell_line_id integer unsigned,
+    grna_id integer unsigned,
+    mean float,
+    std float,
+    
+    PRIMARY KEY (id),
+    FOREIGN KEY(grna_id) REFERENCES grna (id),
+    FOREIGN KEY(cell_line_id) REFERENCES cell_line (id)
+);
+
+CREATE TABLE gene_jacks_result (
+    id integer unsigned NOT NULL AUTO_INCREMENT,
+    cell_line_id integer unsigned,
+    gene_id integer unsigned,
+    score float,
+    std float,
+    p_value float, /* 0.001 cutoff */
+
+    PRIMARY KEY (id),
+    FOREIGN KEY (gene_id) REFERENCES gene (id),
+    FOREIGN KEY (cell_line_id) REFERENCES cell_line (id)
+);
+
+CREATE TABLE achilles_common_essential (
+    id integer unsigned NOT NULL AUTO_INCREMENT,
+    gene_id integer unsigned,
+
+    PRIMARY KEY (id),
+    FOREIGN KEY (gene_id) REFERENCES gene (id)
+);
