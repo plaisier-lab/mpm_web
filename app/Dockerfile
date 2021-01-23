@@ -11,6 +11,4 @@ COPY *.py /app/
 COPY templates /app/templates
 COPY static /app/static
 
-COPY data /app/data
-
 CMD python __main__.py

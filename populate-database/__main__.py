@@ -50,11 +50,110 @@ from flask_sqlalchemy import SQLAlchemy
 
 from scipy import stats
 
-from jacks import interpret_achilles_common_essential, interpret_grna_results, interpret_jacks_results
 from helpers import miRNAInDict, compareMiRNANames, hallmark_name_to_csv_key, parse_mutation_name, parse_locus_name, get_bicluster_id, parse_tf_matrix, parse_miRNA_array, isfloat
 import logger
 
 from models import *
+
+#####################################
+## Helpers                         ##
+#####################################
+
+def miRNAInDict(miRNA, dict1):
+	retMe = []
+	for i in dict1.keys():
+		if compareMiRNANames(miRNA, i):
+			retMe.append(miRNAIDs[i])
+	if len(retMe) == 0:
+		miRNA_shorter = '-'.join(miRNA.split('-')[0:3])
+		for i in dict1.keys():
+			if compareMiRNANames(miRNA_shorter, i):
+				retMe.append(miRNAIDs[i])
+	return retMe
+
+def compareMiRNANames(a, b):
+	if a == b:
+		return 1
+	if len(a) < len(b):
+		if a[-3:] == '-3p':
+			re1 = re.compile(a+'[a-oq-z]?(-\d)?-3p$')
+		else:
+			re1 = re.compile(a+'[a-oq-z]?(-\d)?-5p$')
+		if re1.match(b):
+			return 1
+	else:
+		if b[-3:] == '-3p':
+			re1 = re.compile(b+'[a-oq-z]?(-\d)?-3p$')
+		else:
+			re1 = re.compile(b+'[a-oq-z]?(-\d)?-5p$')
+		if re1.match(a):
+			return 1
+	return 0
+
+def hallmark_name_to_csv_key(hallmark):
+	split = hallmark.split(" ")
+	output = ""
+	for element in split:
+		output += "{}{}".format(element[0].upper(), element[1:])
+	return output
+
+def parse_mutation_name(input):
+	regex = re.compile(r"(X|x|)([0-9]+)_(.+)")
+	match = regex.match(input)
+
+	if match:
+		return (int(match.group(2)), match.group(3))
+	else:
+		return None
+
+def parse_locus_name(input):
+	regex = re.compile(r"(X|x|)([^\s]+)_([A-Za-z]+)")
+	match = regex.match(input)
+
+	if match:
+		return (match.group(2), match.group(3))
+	else:
+		return None
+
+def get_bicluster_id(input):
+	regex = re.compile(r"([a-z_]+)_([0-9]+)")
+	match = regex.match(input)
+
+	if match:
+		return int(match.group(2))
+	else:
+		return None
+
+
+def parse_tf_matrix(bicluster, input):
+	if input == "NA":
+		return None
+	
+	output = [bicluster]
+	rows = input.split(" ")
+	for col in rows:
+		cols = col.split(":")
+		entrez_id = int(cols[0])
+		r_value = Decimal(cols[1])
+		p_value = Decimal(cols[2])
+
+		output.append((entrez_id, r_value, p_value))
+	return output
+
+def parse_miRNA_array(bicluster, input):
+	if input == "NA":
+		return None
+	
+	output = [bicluster]
+	output = output + input.split(" ")
+	return output
+
+def isfloat(value):
+	try:
+		float(value)
+		return True
+	except ValueError:
+		return False
 
 #####################################
 ## Load up conversion dictionaries ##
@@ -184,6 +283,7 @@ with open('data/go.obo', 'r') as inFile:
 db.session.commit()
 
 # Gene -> GO_BP
+'''
 print("gene2go.hsa...")
 with open('data/gene2go.hsa', 'r') as inFile:
 	while 1:
@@ -197,6 +297,7 @@ with open('data/gene2go.hsa', 'r') as inFile:
 			db.session.add(gg1)
 
 db.session.commit()
+'''
 
 # miRNAs
 print("miRNAs...")
@@ -248,6 +349,7 @@ with open('data/hmdd_mpm.csv','r') as inFile:
 		   db.session.add(mp1)
 
 # Load dbDEMC
+'''
 print("dbDEMC.csv...")
 with open('data/dbDEMC.csv','r') as inFile:
    inFile.readline() # Get rid of header
@@ -264,6 +366,7 @@ with open('data/dbDEMC.csv','r') as inFile:
 		   db.session.add(mp1)
 
 db.session.commit()
+'''
 
 # load up TfTargets
 '''
@@ -537,6 +640,13 @@ def interpret_causality_summary(filename, bicluster_prefix):
 				
 				bicluster_name = "{}_{}".format(used_bicluster_prefix, bicluster)
 
+				# TODO this doesn't actually verify the mutation -> regulator -> bicluster flow
+				# from the .sif file. see targetscan_614, BAP1 -> E2F6 -> targetscan_614 doesn't
+				# exist in the .sif file, but b/c of how we verify this connection, it doesn't
+				# need to exist. is this a problem (probably not, we would not get /any/ BAP1
+				# mutations at all if it wasn't for this flaw. apparently BAP1 is very important,
+				# and it should be included as a mutation for a bicluster just as a sanity test
+				# of our database)
 				if sif_mutation_name not in sif_mutation_to_regulators:
 					continue
 
@@ -601,7 +711,6 @@ def interpret_causality_summary(filename, bicluster_prefix):
 				)
 				db.session.add(causal_flow)
 				db.session.commit()
-
 	
 	file.close()
 
@@ -682,7 +791,7 @@ def read_eigengenes(filename, prefix):
 biclusters = {}
 tf_regulators_dict = {}
 mirna_regulators_dict = {}
-with open('data/postProcessed_clustersOfBiclusters_CNA_CNVkit_11202020_12112020.csv') as in_file:
+with open('data/postProcessed_clustersOfBiclusters_CNA_CNVkit_01212021.csv') as in_file:
 	# we need to cache the values so we can create the classes in order. we need to do this so the database can automatically complete the relationships defined in models.py
 	bic_gene_values = []
 	bic_go_values = []
@@ -911,7 +1020,7 @@ with open('data/postProcessed_clustersOfBiclusters_CNA_CNVkit_11202020_12112020.
 
 # handle somatic mutations and causal flows
 '''
-interpret_sif("./data/sifs/causalAndMechanistic_network_CNA_CNVkit_11_20_2020_12112020.sif")
+interpret_sif("./data/sifs/causalAndMechanistic_network_CNA_CNVkit_01_21_2021.sif")
 interpret_causality_summary("./data/causality_CNA_final_8_13_2019/causalitySummary_pita_12112020.csv", "pita")
 interpret_causality_summary("./data/causality_CNA_final_8_13_2019/causalitySummary_targetscan_12112020.csv", "targetscan")
 interpret_causality_summary("./data/causality_CNA_final_8_13_2019/causalitySummary_tfbs_db_12112020.csv", "tfbs_db")
@@ -1151,6 +1260,99 @@ def interpret_achilles_common_essential(file):
 
 	file.close()
 
+def interpret_achilles(cell_line_file, effect_file, dependency_file):
+	cell_line_file = open(cell_line_file, "r")
+	effect_file = open(effect_file, "r")
+	dependency_file = open(dependency_file, "r")
+
+	cell_lines = {}
+	gene_results = {}
+
+	# read in cell lines
+	cell_line_file.readline() # absorb header
+	for line in cell_line_file:
+		split = [i.strip() for i in line.split(",")]
+		name = split[0]
+		cancer_type = split[23]
+
+		if cancer_type == "mesothelioma":
+			cell_lines[name] = CellLine(
+				name=name,
+			)
+
+	# read in effect (essentiality score)
+	print("reading achilles essentiallity scores...")
+	header = effect_file.readline().split(",")
+	found_genes = [int(gene.strip().split(" ")[1][1:-1]) for gene in header[1:]]
+	for line in effect_file:
+		# trick: to avoid premature splitting (which will have high cpu/memory usage), i know the
+		# cell line IDs are fixed length. just gonna grab them with some array manipulation
+		cell_line = line[0:10]
+
+		# discard line if we couldn't find the cell line in the lookup we made earlier from the summary
+		if cell_line not in cell_lines:
+			continue
+		
+		split = line.split(",")
+		for index in range(1, len(split)):
+			entrez_id = found_genes[index - 1]
+			if entrez_id not in genes: # skip genes that we don't know about
+				continue
+
+			data = float(split[index])
+
+			if entrez_id not in gene_results:
+				gene_results[entrez_id] = {}
+
+			# add result based on data we found
+			gene_results[entrez_id][cell_line] = GeneAchillesResult(
+				gene_id=genes[entrez_id].id,
+				score=data,
+				cell_line=cell_lines[cell_line],
+			)
+		
+	# read in dependency (p-value)
+	print("reading achilles p-values...")
+	header = dependency_file.readline().split(",")
+	found_genes = [int(gene.strip().split(" ")[1][1:-1]) for gene in header[1:]]
+	for line in dependency_file:
+		# trick: to avoid premature splitting (which will have high cpu/memory usage), i know the
+		# cell line IDs are fixed length. just gonna grab them with some array manipulation
+		cell_line = line[0:10]
+
+		# discard line if we couldn't find the cell line in the lookup we made earlier from the summary
+		if cell_line not in cell_lines:
+			continue
+		
+		split = line.split(",")
+		for index in range(1, len(split)):
+			entrez_id = found_genes[index - 1]
+			if entrez_id not in genes: # skip genes that we don't know about
+				continue
+
+			data = float(split[index])
+
+			# update p-value
+			if entrez_id in gene_results:
+				gene_results[entrez_id][cell_line].p_value = data
+	
+	# add the cell lines
+	for cell_line in cell_lines.values():
+		db.session.add(cell_line)
+
+	# add the results
+	for cell_line_dict in gene_results.values():
+		for data in cell_line_dict.values():
+			db.session.add(data)
+	
+	print("committing achilles results...")
+	db.session.commit()
+
+	cell_line_file.close()
+	effect_file.close()
+	dependency_file.close()
+
+'''
 cell_lines = interpret_jacks_results(
 	"./data/jacks/MPM_6_1_20_gene_JACKS_results.txt",
 	"./data/jacks/MPM_6_1_20_gene_std_JACKS_results.txt",
@@ -1165,6 +1367,13 @@ interpret_grna_results(
 
 interpret_achilles_common_essential(
 	"./data/Achilles_common_essentials.csv"
+)
+'''
+
+interpret_achilles(
+	"./data/achilles/sample_info.csv",
+	"./data/achilles/Achilles_gene_effect.csv",
+	"./data/achilles/Achilles_gene_dependency.csv"
 )
 
 print("program took {} seconds to complete".format(time.time() - start_time))

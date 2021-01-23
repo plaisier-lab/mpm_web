@@ -378,3 +378,15 @@ class AchillesCommonEssential(db.Model):
     gene_id = db.Column(db.ForeignKey('gene.id'), index=True)
 
     gene = db.relationship('Gene', primaryjoin='AchillesCommonEssential.gene_id == Gene.id', backref='achilles_common_essential')
+
+class GeneAchillesResult(db.Model):
+    __tablename__ = 'achilles_results'
+
+    id = db.Column(db.Integer, primary_key=True)
+    gene_id = db.Column(db.ForeignKey('gene.id'), index=True)
+    cell_line_id = db.Column(db.ForeignKey('cell_line.id'), index=True)
+    score = db.Column(db.Float)
+    p_value = db.Column(db.Float)
+
+    gene = db.relationship('Gene', primaryjoin='GeneAchillesResult.gene_id == Gene.id', backref='achilles_results')
+    cell_line = db.relationship('CellLine', primaryjoin='GeneAchillesResult.cell_line_id == CellLine.id', backref='achilles_results')

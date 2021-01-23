@@ -318,7 +318,7 @@ CREATE TABLE gene_jacks_result (
     gene_id integer unsigned,
     score float,
     std float,
-    p_value float, /* 0.001 cutoff */
+    p_value float,
 
     PRIMARY KEY (id),
     FOREIGN KEY (gene_id) REFERENCES gene (id),
@@ -331,4 +331,16 @@ CREATE TABLE achilles_common_essential (
 
     PRIMARY KEY (id),
     FOREIGN KEY (gene_id) REFERENCES gene (id)
+);
+
+CREATE TABLE achilles_results (
+    id integer unsigned NOT NULL AUTO_INCREMENT,
+    cell_line_id integer unsigned,
+    gene_id integer unsigned,
+    score float,
+    p_value float,
+
+    PRIMARY KEY (id),
+    FOREIGN KEY (gene_id) REFERENCES gene (id),
+    FOREIGN KEY (cell_line_id) REFERENCES cell_line (id)
 );
