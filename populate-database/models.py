@@ -367,6 +367,7 @@ class GRNAJACKSResult(db.Model):
     cell_line_id = db.Column(db.ForeignKey('cell_line.id'), index=True)
     mean = db.Column(db.Float)
     std = db.Column(db.Float)
+    p_value = db.Column(db.Float)
 
     grna = db.relationship('GRNA', primaryjoin='GRNAJACKSResult.grna_id == GRNA.id', backref='grna_jacks_result')
     cell_line = db.relationship('CellLine', primaryjoin='GRNAJACKSResult.cell_line_id == CellLine.id', backref='grna_jacks_result')
@@ -390,3 +391,12 @@ class GeneAchillesResult(db.Model):
 
     gene = db.relationship('Gene', primaryjoin='GeneAchillesResult.gene_id == Gene.id', backref='achilles_results')
     cell_line = db.relationship('CellLine', primaryjoin='GeneAchillesResult.cell_line_id == CellLine.id', backref='achilles_results')
+
+class GRNASequence(db.Model):
+    __tablename__ = 'grna_sequence'
+
+    id = db.Column(db.Integer, primary_key=True)
+    sequence = db.Column(db.String(50))
+    grna_id = db.Column(db.ForeignKey('grna.id'), index=True)
+
+    grna = db.relationship('GRNA', primaryjoin='GRNASequence.grna_id == GRNA.id', backref='grna_sequence')

@@ -1177,9 +1177,10 @@ def interpret_jacks_results(results_file, std_file, p_value_file):
 
 	return cell_lines
 
-def interpret_grna_results(means_file, std_file, cell_lines=[]):
+def interpret_jacks_grna_results(means_file, std_file, sequences_file, cell_lines=[]):
 	means_file = open(means_file, "r")
 	std_file = open(std_file, "r")
+	sequences_file = open(sequences_file, "r")
 
 	results = {}
 	grna = {}
@@ -1232,6 +1233,19 @@ def interpret_grna_results(means_file, std_file, cell_lines=[]):
 			if not math.isnan(value):
 				results[grna_name][cell_line].std = value
 	
+	# read through the sequences file
+	sequences_file.readline() # absorb header
+	for line in sequences_file:
+		split = [i.strip() for i in line.split("\t")]
+		sequence = split[0]
+		grna_name = split[1]
+
+		if grna_name in grna:
+			db.session.add(GRNASequence(
+				sequence=sequence,
+				grna=grna[grna_name],
+			))
+	
 	# commit the results
 	for cell_line_dict in results.values():
 		for data in cell_line_dict.values():
@@ -1241,6 +1255,64 @@ def interpret_grna_results(means_file, std_file, cell_lines=[]):
 
 	means_file.close()
 	std_file.close()
+	sequences_file.close()
+
+# we need something specific for this cell line
+def interpret_meso1_results(results_file, sequences_file):
+	results_file = open(results_file, "r")
+	sequences_file = open(sequences_file, "r")
+	
+	# create the MESO1 cell line
+	cell_line = CellLine(
+		name="MESO1"
+	)
+
+	grnas = {}
+
+	# read the results file
+	results_file.readline() # absorb header
+	for line in results_file:
+		split = [i.strip() for i in line.split(",")]
+		gene_name, grna_id = split[0].split("_")
+		logfoldchange = float(split[7])
+		p_value = float(split[9])
+
+		if gene_name not in symbol2entrez or int(symbol2entrez[gene_name]) not in genes:
+			print("could not find %s for MESO1" % gene_name)
+			continue
+
+		grnas[grna_id] = GRNA(
+			name=grna_id,
+			gene_id=genes[int(symbol2entrez[gene_name])].id
+		)
+
+		db.session.add(GRNAJACKSResult(
+			grna=grnas[grna_id],
+			mean=logfoldchange,
+			p_value=p_value,
+			cell_line=cell_line
+		))
+	
+	# read the sequences file
+	sequences_file.readline() # absorb header
+	for line in sequences_file:
+		split = [i.strip() for i in line.split(",")]
+		grna_id = split[2]
+		sequence = split[4]
+
+		if grna_id not in grnas:
+			continue
+
+		db.session.add(GRNASequence(
+			grna=grnas[grna_id],
+			sequence=sequence
+		))
+	
+	print("committing MESO1...")
+	db.session.commit()
+
+	results_file.close()
+	sequences_file.close()
 
 def interpret_achilles_common_essential(file):
 	file = open(file, "r")
@@ -1352,28 +1424,34 @@ def interpret_achilles(cell_line_file, effect_file, dependency_file):
 	effect_file.close()
 	dependency_file.close()
 
-'''
 cell_lines = interpret_jacks_results(
 	"./data/jacks/MPM_6_1_20_gene_JACKS_results.txt",
 	"./data/jacks/MPM_6_1_20_gene_std_JACKS_results.txt",
 	"./data/jacks/MPM_6_1_20_gene_pval_JACKS_results.txt"
 )
 
-interpret_grna_results(
+interpret_jacks_grna_results(
 	"./data/jacks/MPM_6_1_20_logfoldchange_means.txt",
 	"./data/jacks/MPM_6_1_20_logfoldchange_std.txt",
+	"./data/jacks/barcode-counts.txt",
 	cell_lines=cell_lines
+)
+
+interpret_meso1_results(
+	"./data/MESO1/MESO1_CRISPR_Results.csv",
+	"./data/MESO1/MESO_sgRNA_seqs.csv"
 )
 
 interpret_achilles_common_essential(
 	"./data/Achilles_common_essentials.csv"
 )
-'''
 
+'''
 interpret_achilles(
 	"./data/achilles/sample_info.csv",
 	"./data/achilles/Achilles_gene_effect.csv",
 	"./data/achilles/Achilles_gene_dependency.csv"
 )
+'''
 
 print("program took {} seconds to complete".format(time.time() - start_time))

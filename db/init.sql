@@ -306,6 +306,7 @@ CREATE TABLE grna_jacks_result (
     grna_id integer unsigned,
     mean float,
     std float,
+    p_value float,
     
     PRIMARY KEY (id),
     FOREIGN KEY(grna_id) REFERENCES grna (id),
@@ -323,6 +324,15 @@ CREATE TABLE gene_jacks_result (
     PRIMARY KEY (id),
     FOREIGN KEY (gene_id) REFERENCES gene (id),
     FOREIGN KEY (cell_line_id) REFERENCES cell_line (id)
+);
+
+CREATE TABLE grna_sequence (
+    id integer unsigned NOT NULL AUTO_INCREMENT,
+    grna_id integer unsigned,
+    sequence varchar(50),
+
+    PRIMARY KEY (id),
+    FOREIGN KEY (grna_id) REFERENCES grna (id)
 );
 
 CREATE TABLE achilles_common_essential (
