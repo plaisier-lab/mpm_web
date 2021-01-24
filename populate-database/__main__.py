@@ -228,7 +228,6 @@ db.session.add(ed1)
 db.session.commit()
 
 # Load up gene expression data
-'''
 gene_expression_count = 0
 for patient1 in gexp1.columns:
 	for gene1 in gexp1.index:
@@ -243,7 +242,6 @@ for patient1 in gexp1.columns:
 			db.session.commit()
 			gene_expression_count = 0
 db.session.commit()
-'''
 
 # Add hallmarks of Cancer
 hallmark_names = ['Sustained angiogenesis', 'Insensitivity to antigrowth signals', 'Evading apoptosis', 'Limitless replicative potential', 'Evading immune detection',
@@ -283,7 +281,6 @@ with open('data/go.obo', 'r') as inFile:
 db.session.commit()
 
 # Gene -> GO_BP
-'''
 print("gene2go.hsa...")
 with open('data/gene2go.hsa', 'r') as inFile:
 	while 1:
@@ -297,7 +294,6 @@ with open('data/gene2go.hsa', 'r') as inFile:
 			db.session.add(gg1)
 
 db.session.commit()
-'''
 
 # miRNAs
 print("miRNAs...")
@@ -349,7 +345,6 @@ with open('data/hmdd_mpm.csv','r') as inFile:
 		   db.session.add(mp1)
 
 # Load dbDEMC
-'''
 print("dbDEMC.csv...")
 with open('data/dbDEMC.csv','r') as inFile:
    inFile.readline() # Get rid of header
@@ -366,10 +361,8 @@ with open('data/dbDEMC.csv','r') as inFile:
 		   db.session.add(mp1)
 
 db.session.commit()
-'''
 
 # load up TfTargets
-'''
 print("humanTFs_All.csv...")
 with open("data/humanTFs_All.csv") as in_file:
 	in_file.readline() # consume headers
@@ -488,7 +481,6 @@ def handle_miRNA_json(file_name, source_name):
 
 handle_miRNA_json("targetScan_miRNA_sets_entrez_hsa.json", "Target Scan")
 handle_miRNA_json("pita_miRNA_sets_entrez_hsa.json", "Pita")
-'''
 
 sif_mutation_to_regulators = {} # maps a mutation to an array of regualtors
 sif_regulator_to_mutations = {} # maps a regulator to an array of mutations
@@ -1019,7 +1011,6 @@ with open('data/postProcessed_clustersOfBiclusters_CNA_CNVkit_01212021.csv') as 
 
 
 # handle somatic mutations and causal flows
-'''
 interpret_sif("./data/sifs/causalAndMechanistic_network_CNA_CNVkit_01_21_2021.sif")
 interpret_causality_summary("./data/causality_CNA_final_8_13_2019/causalitySummary_pita_12112020.csv", "pita")
 interpret_causality_summary("./data/causality_CNA_final_8_13_2019/causalitySummary_targetscan_12112020.csv", "targetscan")
@@ -1089,7 +1080,6 @@ for bicluster in biclusters.values():
 			)
 
 db.session.commit()
-'''
 
 def interpret_jacks_results(results_file, std_file, p_value_file):
 	results_file = open(results_file, "r")
@@ -1446,12 +1436,10 @@ interpret_achilles_common_essential(
 	"./data/Achilles_common_essentials.csv"
 )
 
-'''
 interpret_achilles(
 	"./data/achilles/sample_info.csv",
 	"./data/achilles/Achilles_gene_effect.csv",
 	"./data/achilles/Achilles_gene_dependency.csv"
 )
-'''
 
 print("program took {} seconds to complete".format(time.time() - start_time))
