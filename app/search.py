@@ -278,16 +278,23 @@ def decode_hallmark_query(query):
 @search_page.route('/mirna')
 @search_page.route('/mirna/<symbol>')
 def mirna(symbol=None, defaults={'symbol': None}):
+	phenotype_query = request.args.get('phenotype')
+	phenotype_query = phenotype_query if phenotype_query else None
+	hallmarks_query = request.args.get('hallmark')
+	hallmarks_query = hallmarks_query if hallmarks_query else None
+
+	hallmarks = decode_hallmark_query(hallmarks_query)
+	
 	# Get biclusters regulated by mirna
 	db = dbconn()
 	c = db.cursor()
 	c.execute("""SELECT id FROM mirna WHERE name=%s""", [symbol])
 	mirna_pk = c.fetchone()[0]
-	muts = __get_muts(c, mirna_pk, symbol)
+	mutations = __get_muts(c, mirna_pk, symbol)
 	c.execute("""SELECT * FROM mirna_regulator WHERE mirna_id=%s""", [mirna_pk])
-	regs = __get_regulators(c, symbol, "mirna")
+	regulators = __get_regulators(c, symbol, "mirna", hallmark_search=hallmarks, phenotype_search=phenotype_query)
 	db.close()
-	return render_template('search.html', gene=symbol, muts={}, regs=regs, bics={})
+	return render_template('search.html', gene=symbol, mutations={}, regulators=regulators, biclusters={})
 
 
 @search_page.route('/gene')
