@@ -309,8 +309,8 @@ CREATE TABLE grna_jacks_result (
     p_value float,
     
     PRIMARY KEY (id),
-    FOREIGN KEY(grna_id) REFERENCES grna (id),
-    FOREIGN KEY(cell_line_id) REFERENCES cell_line (id)
+    FOREIGN KEY (grna_id) REFERENCES grna (id),
+    FOREIGN KEY (cell_line_id) REFERENCES cell_line (id)
 );
 
 CREATE TABLE gene_jacks_result (

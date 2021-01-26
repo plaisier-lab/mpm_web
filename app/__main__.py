@@ -31,12 +31,14 @@ from database import dbconn
 from bicluster import bicluster_page
 from causal_analysis import causal_analysis_page
 from search import search_page
+from jacks import jacks_page
 
 app = Flask(__name__)
 # app.config.from_envvar('MESO_SETTINGS')
 app.register_blueprint(bicluster_page)
 app.register_blueprint(causal_analysis_page)
 app.register_blueprint(search_page)
+app.register_blueprint(jacks_page)
 
 
 @app.errorhandler(Exception)

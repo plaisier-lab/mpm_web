@@ -16,6 +16,10 @@
     <script src="/static/js/causal-flow.js"></script>
 
     <style>
+      .insignificant-genomics {
+        background-color: #FF5656 !important;
+      }
+      
       .causal-flow-tooltip {
 				display: inline-block;
 				border-radius: 2px;
@@ -83,222 +87,11 @@
 
     <!-- Javascript to modify tables -->
     <script type="text/javascript">
+      let grnaDataTable
+      
       Highcharts.SVGRenderer.prototype.symbols.cross = function (x, y, w, h) {
         return ['M', x, y, 'L', x + w / 1.5, y + h / 1.5, 'M', x + w / 1.5, y, 'L', x, y + h / 1.5, 'z'];
       }
-
-      function plotCausal(mutation, regulator, bicluster) {
-        document.getElementById("expressions-name").innerHTML = `${mutation}&nbsp;<span>🡒</span>&nbsp;${regulator}&nbsp;<span>🡒</span>&nbsp;${bicluster}`
-        let phenotype = document.getElementById("causal-phenotype-select").value
-        
-        let request = new XMLHttpRequest()
-				request.open("GET", `/bicluster-causal-analysis/${mutation.trim()}/${regulator.trim()}/${bicluster.trim()}/${phenotype}`, true)
-				request.responseType = "text"
-				
-				request.onload = (event) => {
-          try {
-            let data = JSON.parse(request.response)
-            
-            document.getElementById("gene-expression-stats").innerHTML = `T = ${data.mutation_gene_expression.stats[0].toPrecision(3)}, p = ${data.mutation_gene_expression.stats[1].toExponential(2)}`
-            $('#gene-expression-boxplot').highcharts({
-              chart: {
-                type: 'boxplot'
-              },
-              legend: {
-                enabled: true
-              },
-              title: {
-                text: ''
-              },
-              xAxis: {
-                tickInterval: 1,
-                labels: {
-                  enabled: true,
-                  formatter: function() {
-                    return ["WT", "Mutated"][this.value]
-                  },
-                }
-              },
-              yAxis: {
-                title: {
-                  text: data.mutation_gene_expression.name,
-                },
-              },
-              series: [{
-                name: 'All',
-                showInLegend: false,
-                colorByPoint: true,
-                data: data.mutation_gene_expression.data,
-                colors: ["#000000"],
-                fillColors: data.mutation_gene_expression.colors,
-              }],
-              plotOptions: {
-                series: {
-                    pointWidth: 100
-                }
-              },
-            });
-
-            document.getElementById("eigengene-stats").innerHTML = `T = ${data.bicluster_eigengene_expression.stats[0].toPrecision(3)}, p = ${data.bicluster_eigengene_expression.stats[1].toExponential(2)}`
-            $('#eigengene-boxplot').highcharts({
-              chart: {
-                type: 'boxplot'
-              },
-              legend: {
-                enabled: true
-              },
-              title: {
-                text: ''
-              },
-              xAxis: {
-                tickInterval: 1,
-                labels: {
-                  enabled: true,
-                  formatter: function() {
-                    return ["WT", "Mutated"][this.value]
-                  },
-                }
-              },
-              yAxis: {
-                title: {
-                  text: data.bicluster_eigengene_expression.name,
-                },
-              },
-              series: [{
-                name: 'All',
-                showInLegend: false,
-                colorByPoint: true,
-                data: data.bicluster_eigengene_expression.data,
-                colors: ["#000000"],
-                fillColors: data.bicluster_eigengene_expression.colors,
-              }],
-              plotOptions: {
-                series: {
-                    pointWidth: 100
-                }
-              },
-            });
-
-            const phenotypes = ["Sarcomatoid", "Epithelioid", "Desmoplastic", "Biphasic"]
-            const phenotypeColors = {
-              'Sarcomatoid': '#2c6dd4',
-              'Epithelioid': '#8a171a',
-              'Desmoplastic': '#ed2024',
-              'Biphasic': '#faa41a',
-              'NA': 'grey',
-            }
-  
-            document.getElementById("scatterplot-stats").innerHTML = `R = ${data.scatter.stats[0].toPrecision(3)}, p = ${data.scatter.stats[1].toExponential(2)}`
-            $('#scatterplot').highcharts({
-              tooltip: {
-                formatter: function () {
-                  return `<b>${this.key}</b><br>${data.mutation_gene_expression.name}: ${this.x}<br>${data.bicluster_eigengene_expression.name}: ${this.y}<br>`
-                }
-              },
-              chart: {
-                type: 'scatter'
-              },
-              legend: {
-                enabled: true
-              },
-              title: {
-                text: ''
-              },
-              xAxis: {
-                title: {
-                  text: data.mutation_gene_expression.name,
-                },
-              },
-              yAxis: {
-                title: {
-                  text: data.bicluster_eigengene_expression.name,
-                },
-              },
-              series: [
-                ...data.scatter.data,
-                {
-                  type: 'line',
-                  name: 'Regression Line',
-                  data: data.scatter.regression,
-                  marker: {
-                    enabled: false
-                  },
-                  states: {
-                    hover: {
-                      lineWidth: 0
-                    }
-                  },
-                  enableMouseTracking: false,
-                  color: "#FF0000"
-                },
-              ]
-            });
-
-            document.getElementById("residual-stats").innerHTML = `T = ${data.residual.stats[0].toPrecision(3)}, p = ${data.residual.stats[1].toExponential(2)}`
-            $('#residual-boxplot').highcharts({
-              chart: {
-                type: 'boxplot'
-              },
-              legend: {
-                enabled: true
-              },
-              title: {
-                text: ''
-              },
-              xAxis: {
-                tickInterval: 1,
-                labels: {
-                  enabled: true,
-                  formatter: function() {
-                    return ["WT", "Mutated"][this.value]
-                  },
-                }
-              },
-              yAxis: {
-                title: {
-                  text: data.residual.name,
-                },
-              },
-              series: [{
-                name: 'All',
-                showInLegend: false,
-                colorByPoint: true,
-                data: data.residual.data,
-                colors: ["#000000"],
-                fillColors: data.residual.colors,
-              }],
-              plotOptions: {
-                series: {
-                  pointWidth: 100
-                }
-              },
-            });
-          }
-          catch {
-
-          }
-				}
-				
-				request.send()
-      }
-      
-      jQuery.extend( jQuery.fn.dataTableExt.oSort, {
-          "non-empty-string-asc": function (str1, str2) {
-              if(str1 == "")
-                  return 1;
-              if(str2 == "")
-                  return -1;
-              return ((str1 < str2) ? -1 : ((str1 > str2) ? 1 : 0));
-          },
-        
-          "non-empty-string-desc": function (str1, str2) {
-              if(str1 == "")
-                  return 1;
-              if(str2 == "")
-                  return -1;
-              return ((str1 < str2) ? 1 : ((str1 > str2) ? -1 : 0));
-          }
-      } );
 
       function plotExpressions(phenotype) {
         let request = new XMLHttpRequest()
@@ -659,21 +452,127 @@
 
         request.send()
       }
+
+      function loadGRNAData(gene, cellLine) {
+        document.getElementById("depmap-link").href = `https://depmap.org/portal/gene/${gene}?tab=dependency`
+        
+        let request = new XMLHttpRequest()
+				request.open("GET", `/grna/${gene}/${cellLine}`, true)
+				request.responseType = "text"
+
+        document.getElementById("genomics-modal-label").innerHTML = `${gene} from ${cellLine}`
+				
+				request.onload = event => {
+          const data = JSON.parse(request.response)
+          const addgeneURL = "https://www.addgene.org/search/catalog/plasmids/?q="
+          let hidePValue = false
+
+          grnaDataTable.clear().draw()
+          for(const grna of data) {
+            grnaDataTable.row.add([
+              grna[0],
+              `<a target="_blank" href="${addgeneURL}${grna[1]}">${grna[1]}</a>`,
+              grna[2],
+              grna[3] ? grna[3] : "N/A",
+            ])
+
+            if(!grna[3]) {
+              hidePValue = true
+            }
+          }
+
+          grnaDataTable.column(3).visible(!hidePValue)
+
+          grnaDataTable.draw()
+        }
+
+        request.send()
+      }
+
+      jQuery.extend(jQuery.fn.dataTableExt.oSort, {
+        "non-empty-string-asc": (str1, str2) => {
+          if(str1 == "") {
+            return 1
+          }
+          if(str2 == "") {
+            return -1
+          }
+          return ((str1 < str2) ? -1 : ((str1 > str2) ? 1 : 0))
+        },
+        "non-empty-string-desc": (str1, str2) => {
+          if(str1 == "") {
+            return 1
+          }
+          if(str2 == "") {
+            return -1
+          }
+          return ((str1 < str2) ? 1 : ((str1 > str2) ? -1 : 0))
+        },
+        "combined-value-asc": (str1, str2) => {
+          const str1Value = parseFloat(str1.split(" ")[0])
+          const str2Value = parseFloat(str2.split(" ")[0])
+          return str2Value - str1Value
+        },
+        "combined-value-desc": (str1, str2) => {
+          const str1Value = parseFloat(str1.split(" ")[0])
+          const str2Value = parseFloat(str2.split(" ")[0])
+          return str1Value - str2Value
+        },
+        "float-asc": (str1, str2) => {
+          return parseFloat(str1) - parseFloat(str2)
+        },
+        "float-desc": (str1, str2) => {
+          return parseFloat(str2) - parseFloat(str1)
+        },
+      })
       
       $(document).ready(function() {
-        $('#gobps').DataTable( {
-          columnDefs: [
-            {type: 'non-empty-string', targets: 2}
-          ],                
+        grnaDataTable = $("#genomics-grna-table").DataTable({
+          columnDefs: [{
+            type: "float",
+            targets: 2,
+          }, {
+            type: "float",
+            targets: 3,
+          }],
+          "order": [[2, "desc"]]
+        })
+        
+        $("#gobps").DataTable({
+          columnDefs: [{
+            type: 'non-empty-string',
+            targets: 2,
+          }],                
           "order": [[2, "asc"]]
-        });
+        })
+
+        $("[name='genomics-table']").DataTable({
+          columnDefs: [{
+            type: "combined-value",
+            targets: 1,
+          }, {
+            type: "float",
+            targets: 2,
+          }],
+          "order": [[1, "desc"]]
+        })
+
+        $("[name='meso1-genomics-table']").DataTable({
+          columnDefs: [{
+            type: "non-empty-string",
+            targets: 0,
+          }],
+          "order": [[0, "asc"]]
+        })
+
         var shiftWindow = function() {
           scrollBy(0, -50)
-        };
-        window.addEventListener("hashchange", shiftWindow);
+        }
+        window.addEventListener("hashchange", shiftWindow)
+
         function load() {
           if (window.location.hash) {
-            shiftWindow();
+            shiftWindow()
           }
         }
 
@@ -697,285 +596,442 @@
         document.getElementById("rvalue-cutoff-range-clone").addEventListener("input", handleRValueInput)
         document.getElementById("rvalue-cutoff-input").addEventListener("input", handleRValueInput)
         document.getElementById("rvalue-cutoff-input-clone").addEventListener("input", handleRValueInput)
+
+        $("[name='genomics-link']").on("click", event => {
+          const geneName = event.target.innerHTML
+          event.preventDefault()
+        })
       });
     </script>
 {% endblock %}
+
 {% block content %}
-    <div class="container-fluid" style="margin-top: 40px;"></div>
+<div class="container-fluid" style="margin-top: 40px;"></div>
+
+<div>
+  <div class='bs-callout bs-callout-success text-center'>
+    <h3><strong>{{ bicluster | upper }}</strong></h3>
+  </div>
+  <div class='bs-callout bs-callout-default'>
+    <h4>Bicluster Network Summary <span class="glyphicon glyphicon-info-sign" data-toggle='collapse' data-target='#bicNet' style='color:#f00;)'></span></h4>
+    <div id='bicNet' class='collapse' style='text-align:justify;'>
+      <div align='center'>
+        <b>Legend:</b>
+        <br>
+        <span class="glyphicon glyphicon-stop" style='color:#d0d;'></span> = Somatically mutated gene/pathway</br>
+        <span class="glyphicon glyphicon-stop" style='color:#f00'></span> = TF;
+        <span class="glyphicon glyphicon-stop" style='color:#ec5'></span> = miRNA; (Regulator edges: <span class="glyphicon glyphicon-arrow-up" style='color:#0f0; opacity:0.7;'></span> = Activation; <span style='color:#f00; opacity:0.7;'><b>T</b></span> = Repression)
+        <br>
+        <span class="glyphicon glyphicon-stop" style='color:#aaa'></span> = Bicluster
+        <br>
+        <span class="glyphicon glyphicon-stop" style='color:#0f0'></span> = Hallmark of Cancer
+      </div>
+    </div>
+    <div id="regulation-graph"></div>
     <div>
-      <div class='bs-callout bs-callout-success text-center'><h3><strong>{{ bicluster | upper }}</strong></h3></div>
-      <div class='bs-callout bs-callout-default'>
-        <h4>Bicluster Network Summary <span class="glyphicon glyphicon-info-sign" data-toggle='collapse' data-target='#bicNet' style='color:#f00;)'></span></h4>
-        <div id='bicNet' class='collapse' style='text-align:justify;'>
-          <div align='center'>
-            <b>Legend:</b>
-            <br>
-            <span class="glyphicon glyphicon-stop" style='color:#d0d;'></span> = Somatically mutated gene/pathway</br>
-            <span class="glyphicon glyphicon-stop" style='color:#f00'></span> = TF;
-            <span class="glyphicon glyphicon-stop" style='color:#ec5'></span> = miRNA; (Regulator edges: <span class="glyphicon glyphicon-arrow-up" style='color:#0f0; opacity:0.7;'></span> = Activation; <span style='color:#f00; opacity:0.7;'><b>T</b></span> = Repression)
-            <br>
-            <span class="glyphicon glyphicon-stop" style='color:#aaa'></span> = Bicluster
-            <br>
-            <span class="glyphicon glyphicon-stop" style='color:#0f0'></span> = Hallmark of Cancer
-          </div>
-        </div>
-        <div id="regulation-graph"></div>
-        <div>
-          <div class="form-group" style="width: 40%; margin: auto;">
-            <label for="formControlRange">Absolute R-Value Cutoff (&gt;= r-values kept)</label>
-            <div style="display: flex;">
-              <input value="0.0" type="text" size="3" style="margin-right: 10px;" id="rvalue-cutoff-input" />
-              <input value="0.0" type="range" min="0" max="1" step="0.1" class="form-control-range" id="rvalue-cutoff-range" />
-            </div>
-          </div>
+      <div class="form-group" style="width: 40%; margin: auto;">
+        <label for="formControlRange">Absolute R-Value Cutoff (&gt;= r-values kept)</label>
+        <div style="display: flex;">
+          <input value="0.0" type="text" size="3" style="margin-right: 10px;" id="rvalue-cutoff-input" />
+          <input value="0.0" type="range" min="0" max="1" step="0.1" class="form-control-range" id="rvalue-cutoff-range" />
         </div>
       </div>
-      <div class='bs-callout bs-callout-default'>
-        <h4>Summary</h4>
-        <div>
-          <br />
-          <div class="form-group" style="width: 200px;">
-            <label for="phenotype-select">Phenotype</label>
-            <select id="phenotype-select" class="form-control">
-              {% for phenotype in expression_selectable_phenotypes %}
-                <option value="{{ phenotype[1] }}">{{ phenotype[0] }}</option>
-              {% endfor %}
-            </select>
-          </div>
-          <table width='100%'>
-            <tr>
-              <td width='60%' align='center'>
-                <span data-toggle='collapse' data-target='#tumorExp'>
-                  <b>Bicluster Expression of Phenotype</b>
-                </span>
-                <span class="glyphicon glyphicon-info-sign" data-toggle='collapse' data-target='#tumorExp' style='color:#f00;'></span>
-                <div id='tumorExp' class='collapse' style='text-align:justify;'>
-                  Expression of genes in bicluster from the selected patient phenotype on left side of red dashed line and out of bicluster on right of red dashed line. Each patient is represented as a boxplot, ordered by their median expression for the bicluster genes (smallest to largest) and colored according to it's phenotype value.
-                </div>
-              </td>
-              <td width='40%' align='center'>
-                <span data-toggle='collapse' data-target='#enrich'>
-                  <b id="enrichment-header">Enrichment of Phenotypes in Qunitiles</b>
-                </span>
-                <span class="glyphicon glyphicon-info-sign" data-toggle='collapse' data-target='#enrich' style='color:#f00;)'></span>
-                <div id='enrich' class='collapse' style='text-align:justify;'>
-                  Patient phenotypes are sorted as on the left and broken into quintiles following the dashed grey lines. Then each quintile is tested for enrichment of each phenotype. The deviation from zero indicate -log10(enrichment p-value), and positive values indicate over-enrichment and negative values underenrichment.
-                </div>
-                <b id="enrichment-scatterplot-stats" style="display: block;"></b>
-              </td>
-            </tr>
-          </table>
-          <div id="boxplot-graph"></div>
-          <div id="enrichment-graph"></div>
-        </div>
-        <table class='table table-bordered table-striped text-center'>
-          <tr>
-              <th class='text-center'>Genes</th><th class='text-center'>Patient Tumors</th><th class='text-center'>FPC Var. Exp.<br>(Perm. <em>p</em>-value)</th><th class='text-center'>Survival<br>(<em>p</em>-value)</th><th class='text-center'>Independent Replication</th>
-          </tr>
-          <tr>
-            <td><a href='#genes'>{{genes|length}}</a></td><td><a href='#tumors'>{{tumors|length}}</a></td>
-            {# varexp #}
-            <td>{% if bic_info.varexp_flag %}<div style='font-weight: bold; color:#990000'>{% endif %}{{"%.2f"|format(bic_info.varexp_fpc)}} ({{"%.1E"|format(bic_info.varexp_fpc_pval)}}){% if bic_info.varexp_flag %}</div>{% endif %}</td>
-            
-            {# Survival #}
-            <td>{% if bic_info.survival_flag %}<div style='font-weight: bold; color:#990000'>{% endif %}{{ "%.2f" | format(bic_info.survival) }} ({{ "%.1E" | format(bic_info.survival_pval) }}){% if bic_info.survival_flag %}</div>{% endif %}</td>
-            
-            {# Replication #}
-            <td><a>{% if not bic_info.repl_coexp and not bic_info.repl_survival %}None{% endif %}{% if bic_info.repl_coexp %}<a href='#replication'>Co-expression</a>{% endif %}<br>{% if bic_info.repl_survival %}<a href='#replication'>Survival</a>{% endif %}</td>
-
-          </tr>
-        </table>
-        <table class='table table-bordered table-striped text-center'>
-          <tr>
-              <th class='text-center'>Regulators</th><th class='text-center'>Causal Flows</th><th class='text-center'>Enriched GO BPs</th><th class='text-center'>Enriched<br>Hallmarks of Cancer</th>
-          </tr>
-          <tr>
-            <td><a href='#regulators'>{{ regulators | count }}</a></td><td><a href='#causal'>{{ causal_flows | count }}</a></td><td><a href='#gobp'>{{ gobps | count }}</a></td><td><a href='#hallmarks'>{{ hallmarks | count }}</a></td>
-          </tr>
-        </table>
-      </div>
-
-      <div class='bs-callout bs-callout-default' id='replication'>
-        <h4>Replication in independent datasets</h4>
-        <div class="container-fluid" style="margin-top: 20px;"></div>
-        <table class='table table-bordered table-striped text-center'>
-          <tr>
-            <th class='text-center'>Study</th><th class='text-center'>FPC Var. Exp. (Perm. <em>p</em>-value)</th><th class='text-center'>Survival (<em>p</em>-value)</th>
-          </tr>
-          {% for rep1 in replication %}
-          <tr>
-            <td><a href='http://www.ncbi.nlm.nih.gov/pubmed/{{ rep1[8] }}' target='_blank'>{{ rep1[7] }}</a></td><td>{% if rep1[9]==1 %}<div style='font-weight: bold; color:#990000'>{% endif %}{{ "%.2f" | format(rep1[3]) }} ({{ "%.1E" | format(rep1[4]) }}){% if rep1[9]==1 %}</div>{% endif %}</td><td>{% if rep1[10]==1 %}<div style='font-weight: bold; color:#990000'>{% endif %}{{ "%.2f" | format(rep1[5]) }} ({{ "%.1E" | format(rep1[6]) }}){% if rep1[10]==1 %}</div>{% endif %}</td>
-          </tr>
+    </div>
+  </div>
+  <div class='bs-callout bs-callout-default'>
+    <h4>Summary</h4>
+    <div>
+      <br />
+      <div class="form-group" style="width: 200px;">
+        <label for="phenotype-select">Phenotype</label>
+        <select id="phenotype-select" class="form-control">
+          {% for phenotype in expression_selectable_phenotypes %}
+            <option value="{{ phenotype[1] }}">{{ phenotype[0] }}</option>
           {% endfor %}
-          <tr>
-          </tr>
-        </table>
+        </select>
       </div>
-      
-      <div class='bs-callout bs-callout-default' id='genes'>
-        <h4>Genes</h4>
-        <div class="container-fluid" style="margin-top: 20px;"></div>
-        <div class='text-left'><ul class='list-inline'>{% for gene in genes %}
-            <li><a href='http://www.genecards.org/cgi-bin/carddisp.pl?gene={{ gene[1] }}' target='_blank'>{{ gene[1] }}</a></li>
-            {% endfor %}</ul></div>
-      </div>
-                        
-      <div class='bs-callout bs-callout-default' id='tumors'>
-        <h4>Patients <span class="glyphicon glyphicon-plus" data-toggle='collapse' data-target='#patients'></span></h4>
-        <div id='patients' class='collapse'><ul class='list-inline'>
-            {% for patient in tumors %}
-            <li>{{ patient[1] }}</li>
-            {% endfor %}
-        </ul></div>
-      </div>
-
-      <div class='bs-callout bs-callout-default' id='regulators'>
-        <h4>Regulators</h4>
-        <div>
-          <div class="form-group" style="width: 40%; margin: auto;">
-            <label for="formControlRange">Absolute R-Value Cutoff (&gt;= r-values kept)</label>
-            <div style="display: flex;">
-              <input value="0.0" type="text" size="3" style="margin-right: 10px;" id="rvalue-cutoff-input-clone" />
-              <input value="0.0" type="range" min="0" max="1" step="0.1" class="form-control-range" id="rvalue-cutoff-range-clone" />
+      <table width='100%'>
+        <tr>
+          <td width='60%' align='center'>
+            <span data-toggle='collapse' data-target='#tumorExp'>
+              <b>Bicluster Expression of Phenotype</b>
+            </span>
+            <span class="glyphicon glyphicon-info-sign" data-toggle='collapse' data-target='#tumorExp' style='color:#f00;'></span>
+            <div id='tumorExp' class='collapse' style='text-align:justify;'>
+              Expression of genes in bicluster from the selected patient phenotype on left side of red dashed line and out of bicluster on right of red dashed line. Each patient is represented as a boxplot, ordered by their median expression for the bicluster genes (smallest to largest) and colored according to it's phenotype value.
             </div>
-          </div>
-        </div>
-        <div class="container-fluid" style="margin-top: 20px;"></div>
-        <table class='table table-bordered table-striped text-center'>
-          <thead>
-            <tr>
-              <th class='text-center'>Type</th>
-              <th class='text-center'>Name</th>
-              <th class='text-center'>Action</th>
-              <th class='text-center'>Prior Knowledge</th>
-              <th class='text-center'>P-Value</th>
-              <th class='text-center'>R-Value</th>
-            </tr>
-          </thead>
-
-          <tbody id="regulators-table"></tbody>
-        </table>        
-      </div>      
-      <div class='bs-callout bs-callout-default' id='causal'>
-        <h4>Causal Flows</h4>
-        <div class="container-fluid" style="margin-top: 20px;"></div>
-        <table class='table table-bordered table-striped text-center'>
-          <colgroup width="20%"></colgroup>
-          <colgroup width="5%"></colgroup>
-          <colgroup width="20%"></colgroup>
-          <colgroup width="5%"></colgroup>
-          <colgroup width="20%"></colgroup>
-          <colgroup width="30%"></colgroup>
-          <tr>
-            <th class='text-center'>
-              <span style='font-weight: bold; color:#990000'>Mutation</span>
-            </th>
-            <th class='text-center'>
-              <span class='glyphicon glyphicon-arrow-right'></span>
-            </th>
-            <th class='text-center'>
-              <span style='font-weight: bold; color:#006600'>Regulator</span>
-            </th>
-            <th class='text-center'>
-              <span class='glyphicon glyphicon-arrow-right'></span>
-            </th>
-            <th class='text-center'>
-              <span style='font-weight: bold; color:#000099'>Bicluster</span>
-            </th>
-            <th class='text-center'>
-              <span style='font-weight: bold;'>Causal Flows</span>
-            </th>
-          </tr>
-          {% for cf1 in causal_flows %}
-          <tr>
-            <td valign="middle">
-              <span style='color:#990000'>{{ cf1[0] }}</span>
-            </td>
-            <td valign="middle">
-              <span class='glyphicon glyphicon-arrow-right'></span>
-            </td>
-            <td valign="middle">
-              <span style='color:#006600'>{{ cf1[1] }}</span>
-            </td>
-            <td valign="middle">
-              <span class='glyphicon glyphicon-arrow-right'></span>
-            </td>
-            <td valign="middle">
-              <span style='color:#000099'>{{ bicluster | upper }}</span>
-            </td>
-            <td valign="middle">
-              <button class="btn btn-primary btn-small expression-viewer" data-toggle="modal" data-target="#expressions-modal" mutation="{{cf1[0]}}" regulator="{{cf1[1]}}" bicluster="{{bicluster}}" style="display: {{ cf1[2] }};">View Causal Flow</button>  
-            </td>
-          </tr>
-          {% endfor %}
-        </table>
-      </div>      
-      <div class='bs-callout bs-callout-default' id='gobp'>
-        <h4>Enriched GO Biological Processes</h4>
-        <div class="container-fluid" style="margin-top: 20px;"></div>
-        <table id='gobps' class='table table-bordered text-center'>
-          <thead>
-            <tr>
-              <td>GO Term</th><td>GO BP ID</td><td>Genes</td>
-</tr>
-</thead>
-<tbody>
-  {% for gobp1 in gobps %}
-  <tr>
-    <td>{{ gobp1[2] | capitalize }}</td><td><a href='http://amigo.geneontology.org/amigo/term/{{ gobp1[1] }}' target='_blank'>{{ gobp1[1] }}</a></td><td>{% if (gobp1[3] | count)>0 %}{% for gene in gobp1[3] %}<a href='http://www.genecards.org/cgi-bin/carddisp.pl?gene={{ gene }}' target='_blank'>{{ gene }}</a> {% endfor %}{% endif %}</td>
-  </tr>
-  {% endfor %}
-</tbody>
-</table>
-</div>
-
-<div class='bs-callout bs-callout-default' id='hallmarks'>
-  
-  <h4>Enriched Hallmarks of Cancer</h4>
-  <div class="container-fluid" style="margin-top: 20px;"></div>
-  <div class="text-left">
-    <table align='center'>
+          </td>
+          <td width='40%' align='center'>
+            <span data-toggle='collapse' data-target='#enrich'>
+              <b id="enrichment-header">Enrichment of Phenotypes in Qunitiles</b>
+            </span>
+            <span class="glyphicon glyphicon-info-sign" data-toggle='collapse' data-target='#enrich' style='color:#f00;)'></span>
+            <div id='enrich' class='collapse' style='text-align:justify;'>
+              Patient phenotypes are sorted as on the left and broken into quintiles following the dashed grey lines. Then each quintile is tested for enrichment of each phenotype. The deviation from zero indicate -log10(enrichment p-value), and positive values indicate over-enrichment and negative values underenrichment.
+            </div>
+            <b id="enrichment-scatterplot-stats" style="display: block;"></b>
+          </td>
+        </tr>
+      </table>
+      <div id="boxplot-graph"></div>
+      <div id="enrichment-graph"></div>
+    </div>
+    <table class='table table-bordered table-striped text-center'>
+      <tr>
+        <th class='text-center'>Genes</th>
+        <th class='text-center'>Patient Tumors</th>
+        <th class='text-center'>FPC Var. Exp.<br>(Perm. <em>p</em>-value)</th>
+        <th class='text-center'>Survival<br>(<em>p</em>-value)</th>
+        <th class='text-center'>Independent Replication</th>
+      </tr>
       <tr>
         <td>
-            <center><span style='font-weight:bold;color:#f00;font-size:14pt;'>Enriched Hallmarks</span></center>
-          <div class="container-fluid" style="margin-top: 10px;"></div>
-          <ul>
-            {% for h1 in hallmarks %} 
-            <li><img src='/static/images/{{ h1[1] }}' width='20' alt='{{ h1[0] }}' title='{{ h1[0] }}'> {{ h1[0] }}</li>
-            {% endfor %}
-        </ul></td>
-        <td><div class="container-fluid" style="margin-left: 15px;"></div></td>
-        <td align='center'>
-          <span style='color:#f00;font-weight:bold;font-size:14pt;'>Legend:</span>
-          <br>&nbsp;<br>
-          <div class="hallmark-container" style="width: 300px;">
-            <img src="/static/images/hallmarks.png" />
-            <img class="{{hallmark_image_class[1]}}" src="/static/images/hallmark 1.png" />
-            <img class="{{hallmark_image_class[2]}}" src="/static/images/hallmark 2.png" />
-            <img class="{{hallmark_image_class[3]}}" src="/static/images/hallmark 3.png" />
-            <img class="{{hallmark_image_class[4]}}" src="/static/images/hallmark 4.png" />
-            <img class="{{hallmark_image_class[5]}}" src="/static/images/hallmark 5.png" />
-            <img class="{{hallmark_image_class[6]}}" src="/static/images/hallmark 6.png" />
-            <img class="{{hallmark_image_class[7]}}" src="/static/images/hallmark 7.png" />
-            <img class="{{hallmark_image_class[8]}}" src="/static/images/hallmark 8.png" />
-            <img class="{{hallmark_image_class[9]}}" src="/static/images/hallmark 9.png" />
-            <img class="{{hallmark_image_class[10]}}" src="/static/images/hallmark 10.png" />
-          </div>
-          <br><small><a href='http://www.ncbi.nlm.nih.gov/pubmed/21376230'>Hanahan and Weinberg, Cell 2011</a></small>
+          <a href='#genes'>{{genes|length}}</a></td><td><a href='#tumors'>{{tumors|length}}</a>
+        </td>
+        {# varexp #}
+        <td>
+          {% if bic_info.varexp_flag %}
+            <div style='font-weight: bold; color:#990000'>
+          {% endif %}
+          {{"%.2f"|format(bic_info.varexp_fpc)}} ({{"%.1E"|format(bic_info.varexp_fpc_pval)}})
+          {% if bic_info.varexp_flag %}
+            </div>
+          {% endif %}
+        </td>
+        
+        {# Survival #}
+        <td>
+          {% if bic_info.survival_flag %}
+            <div style='font-weight: bold; color:#990000'>
+          {% endif %}
+          {{ "%.2f" | format(bic_info.survival) }} ({{ "%.1E" | format(bic_info.survival_pval) }})
+          {% if bic_info.survival_flag %}
+            </div>
+          {% endif %}
+        </td>
+        
+        {# Replication #}
+        <td>
+          {% if not bic_info.repl_coexp and not bic_info.repl_survival %}
+            None
+          {% endif %}
+          {% if bic_info.repl_coexp %}
+            <a href='#replication'>Co-expression</a>
+          {% endif %}
+          <br />
+          {% if bic_info.repl_survival %}
+            <a href='#replication'>Survival</a>
+          {% endif %}
         </td>
       </tr>
     </table>
+    <table class='table table-bordered table-striped text-center'>
+      <tr>
+          <th class='text-center'>Regulators</th><th class='text-center'>Causal Flows</th><th class='text-center'>Enriched GO BPs</th><th class='text-center'>Enriched<br>Hallmarks of Cancer</th>
+      </tr>
+      <tr>
+        <td><a href='#regulators'>{{ regulators | count }}</a></td><td><a href='#causal'>{{ causal_flows | count }}</a></td><td><a href='#gobp'>{{ gobps | count }}</a></td><td><a href='#hallmarks'>{{ hallmarks | count }}</a></td>
+      </tr>
+    </table>
+  </div>
+  <div class='bs-callout bs-callout-default' id='replication'>
+    <h4>Replication in independent datasets</h4>
+    <div class="container-fluid" style="margin-top: 20px;"></div>
+    <table class='table table-bordered table-striped text-center'>
+      <tr>
+        <th class='text-center'>Study</th><th class='text-center'>FPC Var. Exp. (Perm. <em>p</em>-value)</th><th class='text-center'>Survival (<em>p</em>-value)</th>
+      </tr>
+      {% for rep1 in replication %}
+        <tr>
+          <td>
+            <a href='http://www.ncbi.nlm.nih.gov/pubmed/{{ rep1[8] }}' target='_blank'>{{ rep1[7] }}</a></td>
+            <td>
+              {% if rep1[9]==1 %}
+                <div style='font-weight: bold; color:#990000'>
+              {% endif %}
+              {{ "%.2f" | format(rep1[3]) }} ({{ "%.1E" | format(rep1[4]) }})
+              {% if rep1[9]==1 %}
+                </div>
+              {% endif %}
+            </td>
+            <td>
+              {% if rep1[10]==1 %}
+                <div style='font-weight: bold; color:#990000'>
+              {% endif %}
+              {{ "%.2f" | format(rep1[5]) }} ({{ "%.1E" | format(rep1[6]) }})
+              {% if rep1[10]==1 %}
+                </div>
+              {% endif %}
+            </td>
+        </tr>
+      {% endfor %}
+      <tr>
+      </tr>
+    </table>
+  </div>
+  <div class='bs-callout bs-callout-default' id='genes'>
+    <h4>Genes</h4>
+    <div class="container-fluid" style="margin-top: 20px;"></div>
+    <div class='text-left'>
+      <ul class='list-inline'>
+        {% for gene in genes %}
+          <li>
+            <a href='http://www.genecards.org/cgi-bin/carddisp.pl?gene={{ gene[1] }}' target='_blank'>{{ gene[1] }}</a>
+          </li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>          
+  <div class='bs-callout bs-callout-default' id='tumors'>
+    <h4>Patients <span class="glyphicon glyphicon-plus" data-toggle='collapse' data-target='#patients'></span></h4>
+    <div id='patients' class='collapse'>
+      <ul class='list-inline'>
+        {% for patient in tumors %}
+          <li>{{ patient[1] }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+  <div class='bs-callout bs-callout-default' id='regulators'>
+    <h4>Regulators</h4>
+    <div>
+      <div class="form-group" style="width: 40%; margin: auto;">
+        <label for="formControlRange">Absolute R-Value Cutoff (&gt;= r-values kept)</label>
+        <div style="display: flex;">
+          <input value="0.0" type="text" size="3" style="margin-right: 10px;" id="rvalue-cutoff-input-clone" />
+          <input value="0.0" type="range" min="0" max="1" step="0.1" class="form-control-range" id="rvalue-cutoff-range-clone" />
+        </div>
+      </div>
+    </div>
+    <div class="container-fluid" style="margin-top: 20px;"></div>
+    <table class='table table-bordered table-striped text-center'>
+      <thead>
+        <tr>
+          <th class='text-center'>Type</th>
+          <th class='text-center'>Name</th>
+          <th class='text-center'>Action</th>
+          <th class='text-center'>Prior Knowledge</th>
+          <th class='text-center'>P-Value</th>
+          <th class='text-center'>R-Value</th>
+        </tr>
+      </thead>
+
+      <tbody id="regulators-table"></tbody>
+    </table>        
+  </div>      
+  <div class='bs-callout bs-callout-default' id='causal'>
+    <h4>Causal Flows</h4>
+    <div class="container-fluid" style="margin-top: 20px;"></div>
+    <table class='table table-bordered table-striped text-center'>
+      <colgroup width="20%"></colgroup>
+      <colgroup width="5%"></colgroup>
+      <colgroup width="20%"></colgroup>
+      <colgroup width="5%"></colgroup>
+      <colgroup width="20%"></colgroup>
+      <colgroup width="30%"></colgroup>
+      <tr>
+        <th class='text-center'>
+          <span style='font-weight: bold; color:#990000'>Mutation</span>
+        </th>
+        <th class='text-center'>
+          <span class='glyphicon glyphicon-arrow-right'></span>
+        </th>
+        <th class='text-center'>
+          <span style='font-weight: bold; color:#006600'>Regulator</span>
+        </th>
+        <th class='text-center'>
+          <span class='glyphicon glyphicon-arrow-right'></span>
+        </th>
+        <th class='text-center'>
+          <span style='font-weight: bold; color:#000099'>Bicluster</span>
+        </th>
+        <th class='text-center'>
+          <span style='font-weight: bold;'>Causal Flows</span>
+        </th>
+      </tr>
+      {% for cf1 in causal_flows %}
+        <tr>
+          <td valign="middle">
+            <span style='color:#990000'>{{ cf1[0] }}</span>
+          </td>
+          <td valign="middle">
+            <span class='glyphicon glyphicon-arrow-right'></span>
+          </td>
+          <td valign="middle">
+            <span style='color:#006600'>{{ cf1[1] }}</span>
+          </td>
+          <td valign="middle">
+            <span class='glyphicon glyphicon-arrow-right'></span>
+          </td>
+          <td valign="middle">
+            <span style='color:#000099'>{{ bicluster | upper }}</span>
+          </td>
+          <td valign="middle">
+            <button
+              class="btn btn-primary btn-small expression-viewer"
+              data-toggle="modal"
+              data-target="#expressions-modal"
+              mutation="{{cf1[0]}}"
+              regulator="{{cf1[1]}}"
+              bicluster="{{bicluster}}"
+              style="display: {{ cf1[2] }};"
+            >
+              View Causal Flow
+            </button>  
+          </td>
+        </tr>
+      {% endfor %}
+    </table>
+  </div>
+  <div class="bs-callout bs-callout-default" id="genomics">
+    <h4>Functional Genomics</h4>
+    <div class="container-fluid" style="margin-top: 20px;"></div>
+    <div style="display: flex;">
+      {% for cell_line, data in jacks_data.items() %}
+        <div style="margin: 0.5em; width: 100%;">
+          <h4>{{ cell_line }}</h4>
+          <table name="genomics-table" class="table table-bordered table-striped text-center">
+            <thead>
+              <tr>
+                <th class="text-center">Gene</th>
+                <th class="text-center">Essentiallity Score</th>
+                <th class="text-center">P-Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for datum in data %}
+                <tr class="{% if datum[1] >= 0 or datum[3] > 0.001 %}insignificant-genomics{% endif %}">
+                  <td>
+                    <a
+                      href=""
+                      gene="{{ datum[0] }}"
+                      cell-line="{{ cell_line }}"
+                      name="genomics-link"
+                      data-toggle="modal"
+                      data-target="#genomics-modal"
+                    >
+                      <b>{{ datum[0] }}</b>
+                    </a>
+                  </td>
+                  <td>{{ "%.1f" | format(datum[1]) }} &plusmn; {{ "%.2f" | format(datum[2]) }}</td>
+                  <td>{{ "%.1E" | format(datum[3]) }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% endfor %}
+    </div>
+    <i>* entries with p-value < 0.001 or essentiallity score > 0 are colored red</i>
+
+    <div style="margin: auto; width: 300px;">
+      <h4>MESO1</h4>
+      <table name="meso1-genomics-table" class="table table-bordered table-striped text-center">
+        <thead>
+          <tr>
+            <th>Genes</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for gene in meso1_data %}
+            <tr>
+              <td>
+                <a
+                  href=""
+                  gene="{{ gene }}"
+                  cell-line="MESO1"
+                  name="genomics-link"
+                  data-toggle="modal"
+                  data-target="#genomics-modal"
+                >
+                  <b>{{ gene }}</b>
+                </a>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class='bs-callout bs-callout-default' id='gobp'>
+    <h4>Enriched GO Biological Processes</h4>
+    <div class="container-fluid" style="margin-top: 20px;"></div>
+    <table id='gobps' class='table table-bordered text-center'>
+      <thead>
+        <tr>
+          <td>GO Term</th><td>GO BP ID</td><td>Genes</td>
+        </tr>
+      </thead>
+      <tbody>
+        {% for gobp1 in gobps %}
+          <tr>
+            <td>{{ gobp1[2] | capitalize }}</td>
+            <td>
+                <a href='http://amigo.geneontology.org/amigo/term/{{ gobp1[1] }}' target='_blank'>
+                  {{ gobp1[1] }}
+                </a>
+            </td>
+            <td>
+              {% if (gobp1[3] | count)>0 %}
+                {% for gene in gobp1[3] %}
+                  <a href='http://www.genecards.org/cgi-bin/carddisp.pl?gene={{ gene }}' target='_blank'>{{ gene }}</a>
+                {% endfor %}
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class='bs-callout bs-callout-default' id='hallmarks'>
+    <h4>Enriched Hallmarks of Cancer</h4>
+    <div class="container-fluid" style="margin-top: 20px;"></div>
+    <div class="text-left">
+      <table align='center'>
+        <tr>
+          <td>
+            <center><span style='font-weight:bold;color:#f00;font-size:14pt;'>Enriched Hallmarks</span></center>
+            <div class="container-fluid" style="margin-top: 10px;"></div>
+            <ul>
+              {% for h1 in hallmarks %} 
+              <li><img src='/static/images/{{ h1[1] }}' width='20' alt='{{ h1[0] }}' title='{{ h1[0] }}'> {{ h1[0] }}</li>
+              {% endfor %}
+            </ul>
+          </td>
+          <td>
+            <div class="container-fluid" style="margin-left: 15px;"></div>
+          </td>
+          <td align='center'>
+            <span style='color:#f00;font-weight:bold;font-size:14pt;'>Legend:</span>
+            <br>&nbsp;<br>
+            <div class="hallmark-container" style="width: 300px;">
+              <img src="/static/images/hallmarks.png" />
+              <img class="{{hallmark_image_class[1]}}" src="/static/images/hallmark 1.png" />
+              <img class="{{hallmark_image_class[2]}}" src="/static/images/hallmark 2.png" />
+              <img class="{{hallmark_image_class[3]}}" src="/static/images/hallmark 3.png" />
+              <img class="{{hallmark_image_class[4]}}" src="/static/images/hallmark 4.png" />
+              <img class="{{hallmark_image_class[5]}}" src="/static/images/hallmark 5.png" />
+              <img class="{{hallmark_image_class[6]}}" src="/static/images/hallmark 6.png" />
+              <img class="{{hallmark_image_class[7]}}" src="/static/images/hallmark 7.png" />
+              <img class="{{hallmark_image_class[8]}}" src="/static/images/hallmark 8.png" />
+              <img class="{{hallmark_image_class[9]}}" src="/static/images/hallmark 9.png" />
+              <img class="{{hallmark_image_class[10]}}" src="/static/images/hallmark 10.png" />
+            </div>
+            <br><small><a href='http://www.ncbi.nlm.nih.gov/pubmed/21376230'>Hanahan and Weinberg, Cell 2011</a></small>
+          </td>
+        </tr>
+      </table>
+    </div>
   </div>
 </div>
-</div>
 
-<!-- Modal -->
+<!-- causal flow modal -->
 <div class="modal fade" id="expressions-modal" tabindex="-1" role="dialog" aria-labelledby="expressions-modal-label">
   <div class="modal-dialog modal-lg" role="document" style="width: fit-content; padding: 2em;">
     <div class="modal-content">
       <div class="modal-header">
         <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-        <h4 class="modal-title" id="myModalLabel">Causal Flow&nbsp;<div id="expressions-name" style="display: inline;"></div></h4>
+        <h4 class="modal-title" id="expressions-modal-label">Causal Flow&nbsp;<div id="expressions-name" style="display: inline;"></div></h4>
       </div>
       <div class="modal-body" style="padding: 2em;">
         <center>
@@ -995,6 +1051,41 @@
   </div>
 </div>
 
+<!-- functional genomics modal -->
+<div class="modal fade" id="genomics-modal" tabindex="-1" role="dialog" aria-labelledby="genomics-modal-label">
+  <div class="modal-dialog modal-lg" role="document" style="width: fit-content; padding: 2em;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+        <h4 class="modal-title">Functional Genomics&nbsp;<div id="genomics-name" style="display: inline;"></div></h4>
+      </div>
+      <div class="modal-body" style="padding: 2em;">
+        <h4 id="genomics-modal-label"></h4>
+        <table class="table table-bordered table-striped text-center" id="genomics-grna-table">
+          <thead>
+            <tr>
+              <th>gRNA</th>
+              <th>Sequence</th>
+              <th>Mean Log Fold Change</th>
+              <th>P-Value</th>
+            </tr>
+          </thead>
+          <tbody id="genomics-grna-tbody">
+          </tbody>
+        </table>
+        <a
+          target="_blank"
+          id="depmap-link"
+          class="btn btn-primary btn-small"
+          style="display: block; margin: auto; width: 200px; margin-top: 5px;"
+        >
+          View DepMap
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div id="causal-flow-tooltip" class="causal-flow-tooltip"></div>
 
 <script>
@@ -1004,7 +1095,7 @@
 
   for(let i = 0; i < elements.length; i++) {
     let element = elements[i]
-    element.addEventListener("click", (event) => {
+    element.addEventListener("click", event => {
       causalMutation = element.attributes["mutation"].value
       causalRegulator = element.attributes["regulator"].value
       causalBicluster = element.attributes["bicluster"].value
@@ -1012,14 +1103,23 @@
     })
   }
 
-  document.getElementById("causal-phenotype-select").addEventListener("change", (event) => {
+  document.getElementById("causal-phenotype-select").addEventListener("change", event => {
     loadCausalFlow(causalMutation, causalRegulator, causalBicluster, document.getElementById("causal-phenotype-select").value)
   })
 
-  document.getElementById("phenotype-select").addEventListener("change", (event) => {
+  document.getElementById("phenotype-select").addEventListener("change", event => {
     let value = event.target.value
     plotExpressions(value)
   })
+
+  for(const link of document.getElementsByName("genomics-link")) {
+    link.addEventListener("click", function(event) {
+      const gene = this.attributes["gene"].value
+      const cellLine = this.attributes["cell-line"].value
+
+      loadGRNAData(gene, cellLine)
+    })
+  }
 
   plotExpressions("histology_WHO")
 </script>

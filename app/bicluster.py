@@ -12,6 +12,7 @@ import math
 from database import dbconn
 from scipy import stats
 from sklearn.linear_model import LinearRegression
+from jacks import get_jacks_data, get_meso1_data
 
 from graph_common import cluster_data, subtype_enrichment
 from phenotype import get_phenotype_min_max, get_phenotype_color
@@ -28,8 +29,12 @@ def bicluster(bicluster=None):
 	
 	db = dbconn()
 	c = db.cursor()
-	c.execute("""SELECT id,name,var_exp_fpc,var_exp_fpc_p_value,survival,survival_p_value
-FROM bicluster WHERE name=%s""", [bicluster])
+	c.execute(
+		"""SELECT id, name, var_exp_fpc, var_exp_fpc_p_value, survival, survival_p_value
+		FROM bicluster
+		WHERE name=%s""",
+		[bicluster]
+	)
 	bc_pk, bc_name, bc_varexp_fpc, bc_varexp_fpc_pval, bc_survival, bc_survival_pval = c.fetchone()
 	bic_info = {
 		'pk': bc_pk,
@@ -61,12 +66,31 @@ FROM bicluster WHERE name=%s""", [bicluster])
 		):
 			expression_selectable_phenotypes.append((uiName, dbName))
 
-	c.execute("""SELECT g.id, g.symbol, g.entrez FROM bic_gene bg join gene g on bg.gene_id=g.id where bg.bicluster_id=%s order by g.symbol""", [bc_pk])
+	c.execute(
+		"""SELECT g.id, g.symbol, g.entrez
+		FROM bic_gene bg
+		JOIN gene g ON bg.gene_id=g.id
+		WHERE bg.bicluster_id=%s
+		ORDER BY g.symbol""",
+		[bc_pk]
+	)
 	genes = list(c.fetchall())
-	c.execute("""SELECT p.id, p.name FROM bic_pat bp join patient p on p.id=bp.patient_id where bp.bicluster_id=%s order by p.name""", [bc_pk])
+	c.execute(
+		"""SELECT p.id, p.name
+		FROM bic_pat bp
+		JOIN patient p ON p.id=bp.patient_id
+		WHERE bp.bicluster_id=%s
+		ORDER BY p.name""",
+		[bc_pk]
+	)
 	tumors = list(c.fetchall())
 	# Replication
-	c.execute("""SELECT * FROM replication WHERE bicluster_id=%s""", [bc_pk])
+	c.execute(
+		"""SELECT *
+		FROM replication
+		WHERE bicluster_id=%s""",
+		[bc_pk]
+	)
 	tmp = list(c.fetchall())
 
 	# replication datasets (add MESO TCGA in correctly)
@@ -119,6 +143,12 @@ FROM bicluster WHERE name=%s""", [bicluster])
 			[gobp[0], bc_pk]
 		)
 		gobps.append(list(gobp) + [[row[0] for row in c.fetchall()]])
+	
+	# fetch jacks data
+	jacks_data = get_jacks_data(bc_pk)
+
+	# fetch MESO1 data
+	meso1_data = get_meso1_data(bc_pk)
 
 	db.close()
 

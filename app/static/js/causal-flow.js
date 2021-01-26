@@ -1,4 +1,6 @@
 function loadCausalFlow(mutationName, regulatorName, biclusterName, phenotypeName) {
+	document.getElementById("expressions-name").innerHTML = `${mutationName}&nbsp;<span>🡒</span>&nbsp;${regulatorName}&nbsp;<span>🡒</span>&nbsp;${biclusterName}`
+	
 	// set the dimensions and margins of the graph
 	const margin = {
 		top: 40,
