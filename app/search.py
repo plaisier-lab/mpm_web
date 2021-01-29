@@ -104,7 +104,7 @@ def __get_muts(c, gene_pk, gene, hallmark_search=None, phenotype_search=None):
 					"""SELECT *
 					FROM mirna_regulator
 					WHERE id=%s""",
-					[causal_flow[2], causal_flow[4]]
+					[causal_flow[2]]
 				)
 				mirna = c.fetchall()
 				if len(mirna) > 0:
