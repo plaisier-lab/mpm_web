@@ -14,11 +14,25 @@
     <script src="/static/js/cytoscape-dagre.js"></script>
     <script src="/static/js/saveSvgAsPng.js"></script>
     <script src="/static/js/causal-flow.js"></script>
+    <script src="/static/js/achilles-boxplot.js"></script>
 
     <style>
       .insignificant-genomics {
         background-color: #FF5656 !important;
       }
+
+      .achilles-tooltip {
+				display: inline-block;
+				border-radius: 2px;
+				border: 1px solid black;
+				background-color: #EEE;
+				padding: 0.3em;
+				position: fixed;
+				top: -1000px;
+				left: -1000px;
+				opacity: 0;
+				transform: translate(10px, -50%);
+			}
       
       .causal-flow-tooltip {
 				display: inline-block;
@@ -561,6 +575,12 @@
           columnDefs: [{
             type: "non-empty-string",
             targets: 0,
+          }, {
+            type: "float",
+            targets: 1,
+          }, {
+            type: "float",
+            targets: 2,
           }],
           "order": [[0, "asc"]]
         })
@@ -923,17 +943,22 @@
       {% endfor %}
     </div>
     <i>* entries with p-value < 0.001 or essentiallity score > 0 are colored red</i>
-
-    <div style="margin: auto; width: 300px;">
+  </div>
+  <div class="bs-callout bs-callout-default" id="achilles-boxplots">
+    <h4>Functional Genomics in Presence of Cisplatin</h4>
+    <div class="container-fluid" style="margin-top: 20px;"></div>
+    <div style="margin: auto; width: 700px;">
       <h4>MESO1</h4>
       <table name="meso1-genomics-table" class="table table-bordered table-striped text-center">
         <thead>
           <tr>
             <th>Genes</th>
+            <th>Mean Log Fold Change</th>
+            <th>P-Value</th>
           </tr>
         </thead>
         <tbody>
-          {% for gene in meso1_data %}
+          {% for gene, mean, p_value in meso1_data %}
             <tr>
               <td>
                 <a
@@ -947,11 +972,19 @@
                   <b>{{ gene }}</b>
                 </a>
               </td>
+              <td>{{ "%.2f" | format(mean) }}</td>
+              <td>{{ "%.1E" | format(p_value) }}</td>
             </tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
+  </div>
+  <div class="bs-callout bs-callout-default" id="achilles-boxplots">
+    <h4>MPM DepMap Gene Effect Summary</h4>
+    <div class="container-fluid" style="margin-top: 20px;"></div>
+
+    <div id="achilles-boxplot"></div>
   </div>
   <div class='bs-callout bs-callout-default' id='gobp'>
     <h4>Enriched GO Biological Processes</h4>
@@ -1087,6 +1120,7 @@
 </div>
 
 <div id="causal-flow-tooltip" class="causal-flow-tooltip"></div>
+<div id="achilles-tooltip" class="achilles-tooltip"></div>
 
 <script>
   let elements = document.getElementsByClassName("expression-viewer");
@@ -1122,6 +1156,19 @@
   }
 
   plotExpressions("histology_WHO")
+
+  const boxplotSizePerDatum = 140
+  let achillesSize = Math.floor($("#achilles-boxplots").width() / boxplotSizePerDatum)
+  plotAchillesBoxplot("{{ bicluster }}", achillesSize, boxplotSizePerDatum)
+
+  // resize achilles boxplots if screen size changes
+  window.addEventListener("resize", (event) => {
+    if(achillesSize != Math.floor($("#achilles-boxplots").width() / boxplotSizePerDatum)) {
+      achillesSize = Math.floor($("#achilles-boxplots").width() / boxplotSizePerDatum)
+
+      plotAchillesBoxplot("{{ bicluster }}", achillesSize, boxplotSizePerDatum)
+    }
+  })
 </script>
 
 {% endblock %}
