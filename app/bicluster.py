@@ -233,10 +233,6 @@ def get_bicluster_info(bicluster, r_cutoff):
 			if mirna_count != 0:
 				known = 'Yes'
 			
-			# old code
-			# if (not mirna[2]=='no') or (not mirna[3]==0):
-			#	known = 'Yes'
-			
 			regulators.append(['miRNA', mirna[0], mirna[1], 'Repressor', known])
 			mirnaList.append(mirna[1])
 			elements.append({'data': { 'id': 'reg%d' % mirna[2], 'name': mirna[1]}, 'classes': 'mirna' })
@@ -306,7 +302,7 @@ def get_bicluster_info(bicluster, r_cutoff):
 				[mut, mut]
 			)
 			has_graphs = c.fetchone()[0]
-			if has_graphs > 0:
+			if has_graphs > 0 and cf_reg_type == "tf":
 				graph_button_style = "inline"
 			else:
 				graph_button_style = "none"
