@@ -1081,10 +1081,17 @@ for bicluster in biclusters.values():
 
 db.session.commit()
 
-def interpret_jacks_results(results_file, std_file, p_value_file):
+def interpret_jacks_results(subtypes_file, results_file, std_file, p_value_file):
+	subtypes_file = open(subtypes_file, "r")
 	results_file = open(results_file, "r")
 	std_file = open(std_file, "r")
 	p_value_file = open(p_value_file, "r")
+	
+	# read subtypes
+	subtypes = {}
+	for line in subtypes_file:
+		line = [i.strip() for i in line.split("\t")]
+		subtypes[line[0]] = line[1]
 
 	first_line = results_file.readline().split("\t")
 	cell_lines = []
@@ -1093,6 +1100,7 @@ def interpret_jacks_results(results_file, std_file, p_value_file):
 		element = first_line[index].strip()
 		cell_line = CellLine(
 			name=element,
+			subtype=subtypes[element],
 		)
 		cell_lines.append(cell_line)
 		db.session.add(cell_line)
@@ -1161,6 +1169,7 @@ def interpret_jacks_results(results_file, std_file, p_value_file):
 
 	db.session.commit()
 
+	subtypes_file.close()
 	results_file.close()
 	std_file.close()
 	p_value_file.close()
@@ -1322,8 +1331,9 @@ def interpret_achilles_common_essential(file):
 
 	file.close()
 
-def interpret_achilles(cell_line_file, effect_file, dependency_file):
+def interpret_achilles(cell_line_file, subtype_file, effect_file, dependency_file):
 	cell_line_file = open(cell_line_file, "r")
+	subtype_file = open(subtype_file, "r")
 	effect_file = open(effect_file, "r")
 	dependency_file = open(dependency_file, "r")
 
@@ -1334,13 +1344,22 @@ def interpret_achilles(cell_line_file, effect_file, dependency_file):
 	cell_line_file.readline() # absorb header
 	for line in cell_line_file:
 		split = [i.strip() for i in line.split(",")]
-		name = split[0]
+		achilles_id = split[0] # achilles id is ACH-######
+		name = split[1] # actual name
 		cancer_type = split[23]
 
 		if cancer_type == "mesothelioma":
-			cell_lines[name] = CellLine(
+			cell_lines[achilles_id] = CellLine(
 				name=name,
 			)
+		
+	# read in subtypes
+	for line in subtype_file:
+		split = [i.strip() for i in line.split("\t")]
+		achilles_id = split[0]
+		subtype = split[1]
+
+		cell_lines[achilles_id].subtype = subtype
 
 	# read in effect (essentiality score)
 	print("reading achilles essentiallity scores...")
@@ -1411,10 +1430,12 @@ def interpret_achilles(cell_line_file, effect_file, dependency_file):
 	db.session.commit()
 
 	cell_line_file.close()
+	subtype_file.close()
 	effect_file.close()
 	dependency_file.close()
 
 cell_lines = interpret_jacks_results(
+	"./data/jacks/subtypes.txt",
 	"./data/jacks/MPM_6_1_20_gene_JACKS_results.txt",
 	"./data/jacks/MPM_6_1_20_gene_std_JACKS_results.txt",
 	"./data/jacks/MPM_6_1_20_gene_pval_JACKS_results.txt"
@@ -1438,6 +1459,7 @@ interpret_achilles_common_essential(
 
 interpret_achilles(
 	"./data/achilles/sample_info.csv",
+	"./data/achilles/subtype.txt",
 	"./data/achilles/Achilles_gene_effect.csv",
 	"./data/achilles/Achilles_gene_dependency.csv"
 )

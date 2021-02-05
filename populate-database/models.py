@@ -335,7 +335,8 @@ class CellLine(db.Model):
     __tablename__ = 'cell_line'
 
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(10))
+    name = db.Column(db.String(20))
+    subtype = db.Column(db.String(20))
 
 class GeneJACKSResult(db.Model):
     __tablename__ = 'gene_jacks_result'

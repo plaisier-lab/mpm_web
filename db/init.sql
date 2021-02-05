@@ -286,7 +286,8 @@ CREATE TABLE bicluster_phenotype_significance (
 
 CREATE TABLE cell_line (
     id integer unsigned NOT NULL AUTO_INCREMENT,
-    name varchar(10),
+    name varchar(20),
+    subtype varchar(20),
 
     PRIMARY KEY (id)
 );

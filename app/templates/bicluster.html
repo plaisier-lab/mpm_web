@@ -907,9 +907,10 @@
     <h4>Functional Genomics</h4>
     <div class="container-fluid" style="margin-top: 20px;"></div>
     <div style="display: flex;">
-      {% for cell_line, data in jacks_data.items() %}
+      {% for key, data in jacks_data.items() %}
         <div style="margin: 0.5em; width: 100%;">
-          <h4>{{ cell_line }}</h4>
+          {# TODO add cell line subtype into database #}
+          <h4>{{ key[0] }} <a href="https://www.mesothelioma.com/mesothelioma/types/#cell-types" target="_blank">({{ key[1] }})</a></h4>
           <table name="genomics-table" class="table table-bordered table-striped text-center">
             <thead>
               <tr>
@@ -925,7 +926,7 @@
                     <a
                       href=""
                       gene="{{ datum[0] }}"
-                      cell-line="{{ cell_line }}"
+                      cell-line="{{ key[0] }}"
                       name="genomics-link"
                       data-toggle="modal"
                       data-target="#genomics-modal"
@@ -948,7 +949,7 @@
     <h4>Functional Genomics in Presence of Cisplatin</h4>
     <div class="container-fluid" style="margin-top: 20px;"></div>
     <div style="margin: auto; width: 700px;">
-      <h4>MESO1</h4>
+      <h4>MESO1 <a href="https://www.mesothelioma.com/mesothelioma/types/#cell-types" target="_blank">(Epithelioid)</a></h4>
       <table name="meso1-genomics-table" class="table table-bordered table-striped text-center">
         <thead>
           <tr>
@@ -984,7 +985,9 @@
     <h4>MPM DepMap Gene Effect Summary</h4>
     <div class="container-fluid" style="margin-top: 20px;"></div>
 
-    <div id="achilles-boxplot"></div>
+    <div id="achilles-boxplot" style="overflow: auto;"></div>
+
+    <button id="save-achilles-boxplot" class="btn btn-primary btn-small" style="width: 200px; margin-top: 5px; display: block; margin-left: auto; margin-right: auto">Save Image</button>
   </div>
   <div class='bs-callout bs-callout-default' id='gobp'>
     <h4>Enriched GO Biological Processes</h4>
@@ -1157,18 +1160,16 @@
 
   plotExpressions("histology_WHO")
 
-  const boxplotSizePerDatum = 140
-  let achillesSize = Math.floor($("#achilles-boxplots").width() / boxplotSizePerDatum)
-  plotAchillesBoxplot("{{ bicluster }}", achillesSize, boxplotSizePerDatum)
+  plotAchillesBoxplot("{{ bicluster }}", 1410)
 
   // resize achilles boxplots if screen size changes
-  window.addEventListener("resize", (event) => {
+  /*window.addEventListener("resize", (event) => {
     if(achillesSize != Math.floor($("#achilles-boxplots").width() / boxplotSizePerDatum)) {
       achillesSize = Math.floor($("#achilles-boxplots").width() / boxplotSizePerDatum)
 
       plotAchillesBoxplot("{{ bicluster }}", achillesSize, boxplotSizePerDatum)
     }
-  })
+  })*/
 </script>
 
 {% endblock %}

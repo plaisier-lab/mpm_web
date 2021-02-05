@@ -2,6 +2,7 @@ import json
 import numpy as np
 from database import dbconn
 from flask import Blueprint, render_template, request
+from constants import GRAPH_COLOR_MAP
 
 jacks_page = Blueprint("jacks_page", __name__, template_folder="templates")
 
@@ -10,7 +11,7 @@ def get_jacks_data(bicluster_id):
 	c = db.cursor()
 
 	c.execute(
-		"""SELECT g.symbol, score, std, p_value, cl.name
+		"""SELECT g.symbol, score, std, p_value, cl.name, cl.subtype
 		FROM gene_jacks_result gjr
 		JOIN gene g ON gjr.gene_id = g.id
 		JOIN cell_line cl ON gjr.cell_line_id = cl.id
@@ -25,10 +26,10 @@ def get_jacks_data(bicluster_id):
 
 	# order by cell line
 	output = {}
-	for symbol, score, std, p_value, cell_line_name in data:
-		if cell_line_name not in output:
-			output[cell_line_name] = []
-		output[cell_line_name].append((symbol, score, std, p_value))
+	for symbol, score, std, p_value, cell_line_name, subtype in data:
+		if (cell_line_name, subtype) not in output:
+			output[(cell_line_name, subtype)] = []
+		output[(cell_line_name, subtype)].append((symbol, score, std, p_value))
 
 	db.close()
 
@@ -123,9 +124,10 @@ def get_achilles_data_from_bicluster(bicluster):
 	c = db.cursor()
 
 	c.execute(
-		"""SELECT ar.score, g.symbol
+		"""SELECT ar.score, ar.p_value, g.symbol, cl.name, cl.subtype
     FROM achilles_results ar
     JOIN gene g ON ar.gene_id = g.id
+		JOIN cell_line cl ON ar.cell_line_id = cl.id
     WHERE g.id IN (
 			SELECT g2.id
 			FROM bic_gene bg
@@ -136,21 +138,31 @@ def get_achilles_data_from_bicluster(bicluster):
 		[bicluster]
 	)
 	results = c.fetchall()
-	output_dictionary = {}
-	for score, gene in results:
-		if gene not in output_dictionary:
-			output_dictionary[gene] = []
-		output_dictionary[gene].append(score)
+	score_dictionary = {}
+	data_dictionary = {}
+	for score, p_value, gene, cell_line, subtype in results:
+		if gene not in score_dictionary:
+			score_dictionary[gene] = []
+			data_dictionary[gene] = []
+		score_dictionary[gene].append(score)
+		data_dictionary[gene].append({
+			"score": score,
+			"p_value": p_value,
+			"cell_line": cell_line,
+			"subtype": subtype,
+			"color": GRAPH_COLOR_MAP[subtype],
+		})
 	
 	output = []
-	for gene in output_dictionary.keys():
+	for gene in score_dictionary.keys():
 		output.append({
 			"name": gene,
-			"low": np.min(output_dictionary[gene]),
-			"q1":  np.percentile(output_dictionary[gene], q=25.0),
-			"median": np.median(output_dictionary[gene]),
-			"q3": np.percentile(output_dictionary[gene], q=75.0),
-			"high": np.max(output_dictionary[gene]),
+			"low": np.min(score_dictionary[gene]),
+			"q1":  np.percentile(score_dictionary[gene], q=25.0),
+			"median": np.median(score_dictionary[gene]),
+			"q3": np.percentile(score_dictionary[gene], q=75.0),
+			"high": np.max(score_dictionary[gene]),
+			"data": data_dictionary[gene],
 		})
 
 	db.close()
