@@ -184,7 +184,13 @@ def get_bicluster_info(bicluster, r_cutoff):
 	elements.append({'data': { 'id': 'bc%d' % bc_pk, 'name': bc_name}, 'classes': 'bicluster' })
 
 	regulators = []
-	c.execute("""SELECT tfr.id, g.symbol, tfr.r_value, tfr.p_value FROM tf_regulator tfr join gene g on tfr.tf_id=g.id WHERE tfr.bicluster_id=%s""", [bc_pk])
+	c.execute(
+		"""SELECT tfr.id, g.symbol, tfr.r_value, tfr.p_value
+		FROM tf_regulator tfr
+		JOIN gene g ON tfr.tf_id = g.id
+		WHERE tfr.bicluster_id=%s""",
+		[bc_pk]
+	)
 	tfs = list(c.fetchall())
 	tfList = []
 	for tf in tfs:
@@ -208,7 +214,13 @@ def get_bicluster_info(bicluster, r_cutoff):
 		elements.append({'data': { 'id': 'reg%d' % tf[0], 'name': tf[1] }, 'classes': 'tf' })
 		elements.append({'data': { 'id': 'tfbc%d' % tf[0], 'source': 'reg%d' % tf[0], 'target': 'bc%d' % bc_pk }, 'classes': "N/A Action" })
 
-	c.execute("""SELECT mirna.id, mirna.name FROM mirna_regulator mr join mirna on mirna.id=mr.mirna_id WHERE mr.bicluster_id=%s""", [bc_pk])
+	c.execute(
+		"""SELECT mirna.id, mirna.name, mr.id
+    FROM mirna_regulator mr
+    JOIN mirna ON mirna.id = mr.mirna_id
+    WHERE mr.bicluster_id = %s;""",
+		[bc_pk]
+	)
 	mirnas = list(c.fetchall())
 
 	mirnaList = []
@@ -227,41 +239,72 @@ def get_bicluster_info(bicluster, r_cutoff):
 			
 			regulators.append(['miRNA', mirna[0], mirna[1], 'Repressor', known])
 			mirnaList.append(mirna[1])
-			elements.append({'data': { 'id': 'reg%d' % mirna[0], 'name': mirna[1]}, 'classes': 'mirna' })
-			elements.append({'data': { 'id': 'mirnabc%d' % mirna[0], 'source': 'reg%d' % mirna[0], 'target': 'bc%d' % bc_pk }, 'classes': 'repressor' })
+			elements.append({'data': { 'id': 'reg%d' % mirna[2], 'name': mirna[1]}, 'classes': 'mirna' })
+			elements.append({'data': { 'id': 'mirnabc%d' % mirna[2], 'source': 'reg%d' % mirna[2], 'target': 'bc%d' % bc_pk }, 'classes': 'repressor' })
 
 	regulators = sorted(regulators, key=lambda name: name[1])
 
 	# Get causal flows with bicluster
-	c.execute("""SELECT id,somatic_mutation_id,regulator_id,regulator_type,bicluster_id,leo_nb_atob,mlogp_m_atob
-FROM causal_flow WHERE bicluster_id=%s""", [bc_pk])
+	c.execute(
+		"""SELECT id, somatic_mutation_id, regulator_id, regulator_type, bicluster_id, leo_nb_atob, mlogp_m_atob
+    FROM causal_flow WHERE bicluster_id = %s;""",
+		[bc_pk]
+	)
 	tmp_cf = c.fetchall()
 	causal_flows = []
 	for cf_pk, cf_som_mut_id, cf_reg_id, cf_reg_type, cf_bc_id, cf_leo, cf_mlogp in tmp_cf:
 		if cf_reg_type == 'tf':
-			c.execute("""SELECT g.symbol FROM tf_regulator tr JOIN gene g ON tr.tf_id = g.id WHERE tr.id=%s""", [cf_reg_id])
+			c.execute(
+				"""SELECT g.symbol
+				FROM tf_regulator tr
+				JOIN gene g ON tr.tf_id = g.id
+				WHERE tr.id=%s""",
+				[cf_reg_id]
+			)
 			g1 = c.fetchone()[0]
 		else:
-			c.execute("""SELECT m.name FROM mirna_regulator mr JOIN mirna m ON mr.mirna_id = m.id WHERE mr.id=%s""", [cf_reg_id])
+			c.execute(
+				"""SELECT m.name
+				FROM mirna_regulator mr
+				JOIN mirna m ON mr.mirna_id = m.id
+				WHERE mr.id = %s""",
+				[cf_reg_id]
+			)
 			g1 = c.fetchone()[0]
 
 		if (cf_reg_type == 'tf' and g1 in tfList) or (cf_reg_type == 'mirna' and g1 in mirnaList):
-			c.execute("""SELECT * FROM somatic_mutation WHERE id=%s""", [cf_som_mut_id])
+			c.execute(
+				"""SELECT *
+				FROM somatic_mutation
+				WHERE id = %s""",
+				[cf_som_mut_id]
+			)
 			m1 = c.fetchone()
 			if m1[3] == None:
-				c.execute("""SELECT symbol FROM gene WHERE id=%s""", [m1[1]])
+				c.execute(
+					"""SELECT symbol
+					FROM gene
+					WHERE id = %s""",
+					[m1[1]]
+				)
 				mut = c.fetchone()[0]
 			else:
-				c.execute("""SELECT locus_name FROM locus WHERE id=%s """, [m1[3]]) # test: make sure this gets loci
+				c.execute(
+					"""SELECT locus_name
+					FROM locus WHERE id = %s """,
+					[m1[3]]
+				) # test: make sure this gets loci
 				mut = c.fetchone()[0]
 			
-			c.execute("""
-				SELECT COUNT(*) > 0 FROM bueno_deep_filter bd
-					JOIN somatic_mutation sm ON bd.somatic_mutation_id = sm.id
-					LEFT JOIN gene g2 ON sm.ext_id = g2.id
-					LEFT JOIN locus l on sm.locus_id = l.id
-					WHERE g2.symbol=%s OR l.locus_name=%s;
-			""", [mut, mut])
+			c.execute(
+				"""SELECT COUNT(*) > 0
+				FROM bueno_deep_filter bd
+				JOIN somatic_mutation sm ON bd.somatic_mutation_id = sm.id
+				LEFT JOIN gene g2 ON sm.ext_id = g2.id
+				LEFT JOIN locus l on sm.locus_id = l.id
+				WHERE g2.symbol = %s OR l.locus_name = %s;""",
+				[mut, mut]
+			)
 			has_graphs = c.fetchone()[0]
 			if has_graphs > 0:
 				graph_button_style = "inline"
@@ -276,8 +319,13 @@ FROM causal_flow WHERE bicluster_id=%s""", [bc_pk])
 	causal_flows = sorted(causal_flows, key=lambda mutation: mutation[0])
 
 	# Hallmarks of Cancer
-	c.execute("""SELECT hm.id,hm.name FROM hallmark hm join bic_hal bh on hm.id=bh.hallmark_id
-WHERE bh.bicluster_id=%s""", [bc_pk])
+	c.execute(
+		"""SELECT hm.id, hm.name
+		FROM hallmark hm
+		JOIN bic_hal bh ON hm.id = bh.hallmark_id
+		WHERE bh.bicluster_id = %s""",
+		[bc_pk]
+	)
 	hallmarks = []
 	hallmark_to_image = {
 		"Sustained angiogenesis": 5,
