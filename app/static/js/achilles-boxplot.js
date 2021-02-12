@@ -8,7 +8,9 @@ function plotAchillesBoxplot(bicluster, containerWidth) {
 	
 	const boxWidth = containerWidth
 	const boxHeight = 600
-	const bottomPad = 100
+	const bottomPad = 160
+
+	const legendTextHeight = 20
 
 	const tooltip = d3.select("#achilles-tooltip")
 
@@ -18,7 +20,7 @@ function plotAchillesBoxplot(bicluster, containerWidth) {
 	})
 	
 	d3.json(`/achilles-bicluster/${bicluster}`, (json) => {
-		json = json.sort((a, b) => a.name.localeCompare(b.name))
+		json.data = json.data.sort((a, b) => a.name.localeCompare(b.name))
 		main.attr("width", boxWidth + 60)
 			.attr("height", 10 + boxHeight + bottomPad)
 		
@@ -28,7 +30,7 @@ function plotAchillesBoxplot(bicluster, containerWidth) {
 		// x-axis
 		const x = d3.scaleBand()
 			.range([0, boxWidth])
-			.domain(json.map(a => a.name))
+			.domain(json.data.map(a => a.name))
 			.paddingInner(1)
 			.paddingOuter(0.5)
 	
@@ -50,7 +52,7 @@ function plotAchillesBoxplot(bicluster, containerWidth) {
 			.style("text-anchor", "end")
 		
 		// y-axis
-		const minimumScore = json.reduce((minimum, current) => current.low < minimum ? current.low : minimum, 500)
+		const minimumScore = json.data.reduce((minimum, current) => current.low < minimum ? current.low : minimum, 500)
 		const minY = Math.min(-2, minimumScore), maxY = 2
 		const y = d3.scaleLinear()
 			.domain([minY, maxY])
@@ -100,7 +102,7 @@ function plotAchillesBoxplot(bicluster, containerWidth) {
 			})
 		}
 
-		const length = Math.max((containerWidth / json.length - 20) / 2, 5)
+		const length = Math.max((containerWidth / json.data.length - 20) / 2, 5)
 		// line through -1
 		svg.append("line")
 			.attr("x1", 0)
@@ -130,59 +132,61 @@ function plotAchillesBoxplot(bicluster, containerWidth) {
 			.style("transform", `rotate(270deg) translate(${-y(0)}px, -35px)`)
 			.text(`Gene Effect Ceres`)
 
+		const boxplotOutlineColor = "#333333"
+
 		// enter data
 		tooltipify(
 			svg.selectAll("boxplot")
-				.data(json)
+				.data(json.data)
 				.enter()
 				.append("line")
 				.attr("x1", d => Math.floor(x(d.name)))
 				.attr("x2", d => Math.floor(x(d.name)))
 				.attr("y1", d => Math.floor(y(d.low)))
 				.attr("y2", d => Math.floor(y(d.high)))
-				.attr("stroke", "black")
+				.attr("stroke", boxplotOutlineColor)
 				.attr("stroke-width", "2px")
 		)
 
 		// max horizontal line
 		tooltipify(
 			svg.selectAll("boxplot")
-				.data(json)
+				.data(json.data)
 				.enter()
 				.append("line")
 				.attr("x1", d => Math.floor(x(d.name) - length))
 				.attr("x2", d => Math.floor(x(d.name) + length))
 				.attr("y1", d => Math.floor(y(d.high)))
 				.attr("y2", d => Math.floor(y(d.high)))
-				.attr("stroke", "black")
+				.attr("stroke", boxplotOutlineColor)
 				.attr("stroke-width", "2px")
 		)
 		
 		// min horizontal line
 		tooltipify(
 			svg.selectAll("boxplot")
-				.data(json)
+				.data(json.data)
 				.enter()
 				.append("line")
 				.attr("x1", d => Math.floor(x(d.name) - length))
 				.attr("x2", d => Math.floor(x(d.name) + length))
 				.attr("y1", d => Math.floor(y(d.low)))
 				.attr("y2", d => Math.floor(y(d.low)))
-				.attr("stroke", "black")
+				.attr("stroke", boxplotOutlineColor)
 				.attr("stroke-width", "2px")
 		)
 		
 		// drawing the boxes
 		tooltipify(
 			svg.selectAll("boxplot")
-				.data(json)
+				.data(json.data)
 				.enter()
 				.append("rect")
 				.attr("x", d => Math.floor(x(d.name) - length))
 				.attr("y", d => Math.floor(y(d.q3)))
 				.attr("height", d => Math.floor(y(d.q1) - y(d.q3)))
 				.attr("width", length * 2)
-				.attr("stroke", "black")
+				.attr("stroke", boxplotOutlineColor)
 				.attr("stroke-width", "2px")
 				.style("fill", "#FFFFFF")
 		)
@@ -190,30 +194,23 @@ function plotAchillesBoxplot(bicluster, containerWidth) {
 		// median line
 		tooltipify(
 			svg.selectAll("boxplot")
-				.data(json)
+				.data(json.data)
 				.enter()
 				.append("line")
 				.attr("x1", d => Math.floor(x(d.name) - length))
 				.attr("x2", d => Math.floor(x(d.name) + length))
 				.attr("y1", d => Math.floor(y(d.median)))
 				.attr("y2", d => Math.floor(y(d.median)))
-				.attr("stroke", "black")
+				.attr("stroke", boxplotOutlineColor)
 				.attr("stroke-width", "2px")
 		)
 
 		// dots for each cell line
-		for(const datum of json) {
+		for(const datum of json.data) {
 			const gene = datum.name
 			const nodes = svg.selectAll("dot")
 				.data(datum.data)
 				.enter()
-				/*.append("line")
-				.attr("x1", d => Math.floor(x(gene) - length - 5))
-				.attr("x2", d => Math.floor(x(gene) + length + 5))
-				.attr("y1", d => Math.floor(y(d.score)))
-				.attr("y2", d => Math.floor(y(d.score)))
-				.attr("stroke", d => d.color)
-				.attr("stroke-width", "2px")*/
 				.append("circle")
 				.attr("cx", d => Math.floor(x(gene)))
 				.attr("cy", d => Math.floor(y(d.score)))
@@ -254,5 +251,38 @@ function plotAchillesBoxplot(bicluster, containerWidth) {
 			
 			nodes.sort((a, b) => -1)
 		}
+
+		// draw legend
+		const colorDomain = d3.scaleLinear().range(
+			json.legend.map(
+				value => value.color
+			)
+		).domain(
+			json.legend.map(
+				value => json.legend.indexOf(value) + 1
+			)
+		)
+
+		const legend = main.append("g")
+			.attr("transform", `translate(50, ${boxHeight + 120})`)
+			.attr("width", 300)
+			.attr("height", Math.ceil(json.legend.length / 2) * legendTextHeight)
+			.selectAll("g")
+			.data(colorDomain.domain().slice())
+			.enter()
+			.append("g")
+			.attr("transform", (d, i) => `translate(${(i % 2) * 300 / 2}, ${Math.floor(i / 2) * legendTextHeight})`)
+		
+		legend.append("circle")
+			.attr("r", 5)
+			.style("fill", colorDomain)
+			.attr("transform", (d, i) => "translate(10, 10)")
+		
+		legend.append("text")
+			.data(json.legend.map(value => value.subtype))
+			.attr("x", 20)
+			.attr("y", 10)
+			.attr("dy", ".35em")
+			.text(d => d)
 	})
 }

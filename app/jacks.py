@@ -2,7 +2,7 @@ import json
 import numpy as np
 from database import dbconn
 from flask import Blueprint, render_template, request
-from constants import GRAPH_COLOR_MAP
+from constants import GRAPH_COLOR_MAP, ENRICHMENT_PHENOTYPES
 
 jacks_page = Blueprint("jacks_page", __name__, template_folder="templates")
 
@@ -167,7 +167,10 @@ def get_achilles_data_from_bicluster(bicluster):
 
 	db.close()
 
-	return output
+	return {
+		"data": output,
+		"legend": [{"subtype": subtype, "color": GRAPH_COLOR_MAP[subtype]} for subtype in ENRICHMENT_PHENOTYPES]
+	}
 
 @jacks_page.route('/achilles-bicluster/<bicluster>/')
 def achilles_data_bicluster(bicluster=None):
