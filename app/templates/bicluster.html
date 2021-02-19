@@ -403,13 +403,17 @@
               ? `<div style='font-weight: bold; color:#990000'>${regulator[3]}</div>`
               : `<div style='font-weight: bold; color:#009900'>${regulator[3]}</div>`
             
+            let priorLink = regulator[7]
+              ? `<a href=${regulator[7]} target="_blank">${regulator[4]}</a>`
+              : regulator[4]
+
             document.getElementById("regulators-table").innerHTML += `
               <td>${regulator[0]}</td>
               <td><a href='/search?gene=${regulator[2]}'>${regulator[2]}</a></td>
               <td>${action}</td>
-              <td>${regulator[4]}</td>
-              <td>${regulator[5] || "N/A"}</td>
+              <td>${priorLink}</td>
               <td>${regulator[6] || "N/A"}</td>
+              <td>${regulator[5] || "N/A"}</td>
             `
           }
 
@@ -854,8 +858,8 @@
           <th class='text-center'>Name</th>
           <th class='text-center'>Action</th>
           <th class='text-center'>Prior Knowledge</th>
-          <th class='text-center'>P-Value</th>
           <th class='text-center'>R-Value</th>
+          <th class='text-center'>P-Value</th>
         </tr>
       </thead>
 

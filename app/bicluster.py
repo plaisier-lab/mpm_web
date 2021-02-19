@@ -185,31 +185,47 @@ def get_bicluster_info(bicluster, r_cutoff):
 
 	regulators = []
 	c.execute(
-		"""SELECT tfr.id, g.symbol, tfr.r_value, tfr.p_value
+		"""SELECT tfr.id, g.symbol, g.id, tfr.p_value, tfr.r_value
 		FROM tf_regulator tfr
 		JOIN gene g ON tfr.tf_id = g.id
-		WHERE tfr.bicluster_id=%s""",
+		WHERE tfr.bicluster_id = %s""",
 		[bc_pk]
 	)
 	tfs = list(c.fetchall())
 	tfList = []
 	for tf in tfs:
-		if abs(tf[2]) < r_cutoff:
+		if abs(tf[4]) < r_cutoff:
 			continue
 		
 		known = 'No'
-		'''
-		c.execute("""SELECT * FROM tf_crispr WHERE gene_id=%s""", [tf[0]]) # we will have this table soon
-		for crispr in c.fetchall():
-			if float(crispr[4])<=0.05:
-				known = 'Yes'
-		'''
+		c.execute(
+			"""SELECT COUNT(*)
+			FROM gene_prior gp
+			JOIN gene g ON gp.gene_id = g.id
+			WHERE g.symbol = %s;""",
+			[tf[1]]
+		)
+		tf_count = c.fetchone()[0]
+		if tf_count != 0:
+			known = 'Yes'
 
 		tf_action = "Repressor"
-		if tf[2] > 0:
+		if tf[4] > 0:
 			tf_action = "Activator"
 
-		regulators.append(['TF', tf[0], tf[1], tf_action, known, "{:.5g}".format(tf[3]), "{:.5g}".format(tf[2])])
+		link = "https://www.disgenet.org/browser/0/1/1/C0345967::C0812413::C0025500::C0346109::C0334513::C0334515::C1377913/0/25/124/geneid__%s-source__ALL/_b./name/"
+		link = link % tf[2] if known == "Yes" else None
+
+		regulators.append([
+			'TF',
+			tf[0],
+			tf[1],
+			tf_action,
+			known,
+			"{:.5g}".format(tf[3]),
+			"{:.5g}".format(tf[4]),
+			link,
+		])
 		tfList.append(tf[1])
 		elements.append({'data': { 'id': 'reg%d' % tf[0], 'name': tf[1] }, 'classes': 'tf' })
 		elements.append({'data': { 'id': 'tfbc%d' % tf[0], 'source': 'reg%d' % tf[0], 'target': 'bc%d' % bc_pk }, 'classes': "N/A Action" })
@@ -232,8 +248,17 @@ def get_bicluster_info(bicluster, r_cutoff):
 			mirna_count = c.fetchone()[0]
 			if mirna_count != 0:
 				known = 'Yes'
-			
-			regulators.append(['miRNA', mirna[0], mirna[1], 'Repressor', known, mirna[3], mirna[4]])
+
+			regulators.append([
+				'miRNA',
+				mirna[0],
+				mirna[1],
+				'Repressor',
+				known,
+				"{:.5g}".format(mirna[3]) if mirna[3] else mirna[3],
+				"{:.5g}".format(mirna[4]) if mirna[4] else mirna[4],
+				None
+			])
 			mirnaList.append(mirna[1])
 			elements.append({'data': { 'id': 'reg%d' % mirna[2], 'name': mirna[1]}, 'classes': 'mirna' })
 			elements.append({'data': { 'id': 'mirnabc%d' % mirna[2], 'source': 'reg%d' % mirna[2], 'target': 'bc%d' % bc_pk }, 'classes': 'repressor' })
