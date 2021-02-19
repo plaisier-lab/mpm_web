@@ -17,6 +17,29 @@
     <script src="/static/js/achilles-boxplot.js"></script>
 
     <style>
+      #side-nav {
+        position: fixed;
+        top: 50px;
+        width: 175px;
+        padding: 10px;
+        padding-left: 15px;
+      }
+
+      #side-nav a {
+        display: block;
+        margin-bottom: 4px;
+        padding-top: 2px;
+        color: #600;
+        font-weight: normal;
+        text-decoration: none;
+      }
+
+      #side-nav a.active {
+        font-weight: bold;
+        border-bottom: 2px solid #600;
+        margin-bottom: 3px;
+      }
+      
       .insignificant-genomics {
         background-color: #FF5656 !important;
       }
@@ -632,7 +655,7 @@
   <div class='bs-callout bs-callout-success text-center'>
     <h3><strong>{{ bicluster | upper }}</strong></h3>
   </div>
-  <div class='bs-callout bs-callout-default'>
+  <div id="Bicluster Network Summary" class='bs-callout bs-callout-default'>
     <h4>Bicluster Network Summary <span class="glyphicon glyphicon-info-sign" data-toggle='collapse' data-target='#bicNet' style='color:#f00;)'></span></h4>
     <div id='bicNet' class='collapse' style='text-align:justify;'>
       <div align='center'>
@@ -658,7 +681,7 @@
       </div>
     </div>
   </div>
-  <div class='bs-callout bs-callout-default'>
+  <div id="Summary" class='bs-callout bs-callout-default'>
     <h4>Summary</h4>
     <div>
       <br />
@@ -754,7 +777,7 @@
       </tr>
     </table>
   </div>
-  <div class='bs-callout bs-callout-default' id='replication'>
+  <div id="Replication" class='bs-callout bs-callout-default' id='replication'>
     <h4>Replication in independent datasets</h4>
     <div class="container-fluid" style="margin-top: 20px;"></div>
     <table class='table table-bordered table-striped text-center'>
@@ -789,7 +812,7 @@
       </tr>
     </table>
   </div>
-  <div class='bs-callout bs-callout-default' id='genes'>
+  <div id="Genes" class='bs-callout bs-callout-default' id='genes'>
     <h4>Genes</h4>
     <div class="container-fluid" style="margin-top: 20px;"></div>
     <div class='text-left'>
@@ -802,7 +825,7 @@
       </ul>
     </div>
   </div>          
-  <div class='bs-callout bs-callout-default' id='tumors'>
+  <div id="Patients" class='bs-callout bs-callout-default' id='tumors'>
     <h4>Patients <span class="glyphicon glyphicon-plus" data-toggle='collapse' data-target='#patients'></span></h4>
     <div id='patients' class='collapse'>
       <ul class='list-inline'>
@@ -812,7 +835,7 @@
       </ul>
     </div>
   </div>
-  <div class='bs-callout bs-callout-default' id='regulators'>
+  <div id="Regulators" class='bs-callout bs-callout-default' id='regulators'>
     <h4>Regulators</h4>
     <div>
       <div class="form-group" style="width: 40%; margin: auto;">
@@ -837,9 +860,10 @@
       </thead>
 
       <tbody id="regulators-table"></tbody>
-    </table>        
+    </table>
+    <i>* miRNA regulators are taken from TCGA, gene regulators are taken from Genentech</i>
   </div>      
-  <div class='bs-callout bs-callout-default' id='causal'>
+  <div id="Causal Flows" class='bs-callout bs-callout-default' id='causal'>
     <h4>Causal Flows</h4>
     <div class="container-fluid" style="margin-top: 20px;"></div>
     <table class='table table-bordered table-striped text-center'>
@@ -903,7 +927,7 @@
       {% endfor %}
     </table>
   </div>
-  <div class="bs-callout bs-callout-default" id="genomics">
+  <div id="Functional Genomics" class="bs-callout bs-callout-default" id="genomics">
     <h4>Functional Genomics</h4>
     <div class="container-fluid" style="margin-top: 20px;"></div>
     <div style="display: flex;">
@@ -945,7 +969,7 @@
     </div>
     <i>* entries with p-value < 0.001 or essentiallity score > 0 are colored red</i>
   </div>
-  <div class="bs-callout bs-callout-default" id="achilles-boxplots">
+  <div id="Functional Genomics w/ Cisplatin" class="bs-callout bs-callout-default" id="achilles-boxplots">
     <h4>Functional Genomics in Presence of Cisplatin</h4>
     <div class="container-fluid" style="margin-top: 20px;"></div>
     <div style="margin: auto; width: 700px;">
@@ -981,7 +1005,7 @@
       </table>
     </div>
   </div>
-  <div class="bs-callout bs-callout-default" id="achilles-boxplots">
+  <div id="DepMap Summary" class="bs-callout bs-callout-default" id="achilles-boxplots">
     <h4>MPM DepMap Gene Effect Summary</h4>
     <div class="container-fluid" style="margin-top: 20px;"></div>
 
@@ -989,7 +1013,7 @@
 
     <button id="save-achilles-boxplot" class="btn btn-primary btn-small" style="width: 200px; margin-top: 5px; display: block; margin-left: auto; margin-right: auto">Save Image</button>
   </div>
-  <div class='bs-callout bs-callout-default' id='gobp'>
+  <div id="GO Biological Processes" class='bs-callout bs-callout-default' id='gobp'>
     <h4>Enriched GO Biological Processes</h4>
     <div class="container-fluid" style="margin-top: 20px;"></div>
     <table id='gobps' class='table table-bordered text-center'>
@@ -1019,7 +1043,7 @@
       </tbody>
     </table>
   </div>
-  <div class='bs-callout bs-callout-default' id='hallmarks'>
+  <div id="Hallmarks of Cancer" class='bs-callout bs-callout-default' id='hallmarks'>
     <h4>Enriched Hallmarks of Cancer</h4>
     <div class="container-fluid" style="margin-top: 20px;"></div>
     <div class="text-left">
@@ -1171,5 +1195,7 @@
     }
   })*/
 </script>
+
+<script src="/static/js/side-nav.js"></script>
 
 {% endblock %}

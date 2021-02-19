@@ -780,6 +780,49 @@ def read_eigengenes(filename, prefix):
 				eigengene_count = 0
 	db.session.commit()
 
+mimat_r_values = {}
+mimat_p_values = {}
+
+def read_miRNA_p_r_values(r_values_file, p_values_file):
+	r_values_file = open(r_values_file, "r")
+	p_values_file = open(p_values_file, "r")
+
+	# figure out what mimats we're dealing with
+	r_values_mimat = [mimat.strip()[1:-1] for mimat in r_values_file.readline().split(",")[1:]]
+	p_values_mimat = [mimat.strip()[1:-1] for mimat in p_values_file.readline().split(",")[1:]]
+
+	# read in r-values
+	for line in r_values_file:
+		split = line.split(",")
+		bicluster = split[0][1:-1]
+
+		index = 0
+		for value in split[1:]:
+			mimat = r_values_mimat[index]
+			value = float(value)
+			mimat_r_values[(bicluster, mimat)] = value
+			index = index + 1
+	
+	# read in p-values
+	for line in p_values_file:
+		split = line.split(",")
+		bicluster = split[0][1:-1]
+
+		index = 0
+		for value in split[1:]:
+			mimat = p_values_mimat[index]
+			value = float(value)
+			mimat_p_values[(bicluster, mimat)] = value
+			index = index + 1
+
+	r_values_file.close()
+	p_values_file.close()
+
+read_miRNA_p_r_values(
+	"./data/miRNA_cor_mesoTCGA/eig_miR_cor_12112020.csv",
+	"./data/miRNA_cor_mesoTCGA/eig_miR_pv_12112020.csv",
+)
+
 biclusters = {}
 tf_regulators_dict = {}
 mirna_regulators_dict = {}
@@ -822,12 +865,12 @@ with open('data/postProcessed_clustersOfBiclusters_CNA_CNVkit_01212021.csv') as 
 
 		# create a bicluster
 		if bicluster_name not in biclusters:
-			bicluster = Bicluster( \
-				name = bicluster_name, \
-				var_exp_fpc = split[header_dict["Var. Exp. First PC"]], \
-				var_exp_fpc_p_value = split[header_dict["Var. Exp. First PC Perm. P-Value"]], \
-				survival = split[header_dict["OS.covAgeSex"]], \
-				survival_p_value = split[header_dict["OS.covAgeSex.p"]] \
+			bicluster = Bicluster(
+				name = bicluster_name,
+				var_exp_fpc = split[header_dict["Var. Exp. First PC"]],
+				var_exp_fpc_p_value = split[header_dict["Var. Exp. First PC Perm. P-Value"]],
+				survival = split[header_dict["OS.covAgeSex"]],
+				survival_p_value = split[header_dict["OS.covAgeSex.p"]]
 			)
 			db.session.add(bicluster)
 
@@ -906,18 +949,18 @@ with open('data/postProcessed_clustersOfBiclusters_CNA_CNVkit_01212021.csv') as 
 				if entrez not in genes:
 					print("bic_gene warning: could not find gene id {}".format(entrez))
 				else:
-					db.session.add(BicGene( \
-						bicluster_id = biclusters[tuple_val[0]].id, \
-						gene_id = genes[entrez].id \
+					db.session.add(BicGene(
+						bicluster_id = biclusters[tuple_val[0]].id,
+						gene_id = genes[entrez].id
 					))
 
 		'''
 		elif tuple_val[1] not in genes:
 			print("bic_gene warning: could not find gene id {}".format(tuple_val[1])) # report: sometimes a gene just cannot be associated with a bicluster, which screws with results in the search. what to do?
 		else:
-			db.session.add(BicGene( \
-				bicluster_id = biclusters[tuple_val[0]].id, \
-				gene_id = genes[tuple_val[1]].id \
+			db.session.add(BicGene(
+				bicluster_id = biclusters[tuple_val[0]].id,
+				gene_id = genes[tuple_val[1]].id
 			))
 		'''
 	
@@ -926,9 +969,9 @@ with open('data/postProcessed_clustersOfBiclusters_CNA_CNVkit_01212021.csv') as 
 		if tuple_val[1] != "NA":
 			split = tuple_val[1].split(";")
 			for go_val in split:
-				db.session.add(BicGo( \
-					bicluster_id = biclusters[tuple_val[0]].id, \
-					go_bp_id = geneOntology[go_val].id \
+				db.session.add(BicGo(
+					bicluster_id = biclusters[tuple_val[0]].id,
+					go_bp_id = geneOntology[go_val].id
 				))
 	
 	# create all the BicPat's
@@ -936,9 +979,9 @@ with open('data/postProcessed_clustersOfBiclusters_CNA_CNVkit_01212021.csv') as 
 		split = tuple_val[1].split(" ")
 		for patient in split:
 			if patient_check.match(patient):
-				db.session.add(BicPat( \
-					bicluster_id = biclusters[tuple_val[0]].id, \
-					patient_id = patients[patient].id \
+				db.session.add(BicPat(
+					bicluster_id = biclusters[tuple_val[0]].id,
+					patient_id = patients[patient].id
 				))
 
 	# create all the BicHals
@@ -948,9 +991,9 @@ with open('data/postProcessed_clustersOfBiclusters_CNA_CNVkit_01212021.csv') as 
 		hallmark_value = tuple_val[2]
 
 		if hallmark_value >= 0.8:
-			db.session.add(BicHal( \
-				bicluster_id = biclusters[bicluster_name].id, \
-				hallmark_id = hallmarks[hallmark_name].id \
+			db.session.add(BicHal(
+				bicluster_id = biclusters[bicluster_name].id,
+				hallmark_id = hallmarks[hallmark_name].id
 			))
 	
 	# create all the Replications
@@ -961,13 +1004,13 @@ with open('data/postProcessed_clustersOfBiclusters_CNA_CNVkit_01212021.csv') as 
 		survival = tuple_val[3]
 		survival_p_value = tuple_val[4]
 
-		db.session.add(Replication( \
-			bicluster_id = biclusters[bicluster_name].id, \
-			study = "MESO TCGA", \
-			var_exp_fpc = var_exp_fpc, \
-			var_exp_fpc_p_value = var_exp_fpc_p_value, \
-			survival = survival, \
-			survival_p_value = survival_p_value \
+		db.session.add(Replication(
+			bicluster_id = biclusters[bicluster_name].id,
+			study = "MESO TCGA",
+			var_exp_fpc = var_exp_fpc,
+			var_exp_fpc_p_value = var_exp_fpc_p_value,
+			survival = survival,
+			survival_p_value = survival_p_value
 		))
 	
 	# create all TF regulators
@@ -977,11 +1020,11 @@ with open('data/postProcessed_clustersOfBiclusters_CNA_CNVkit_01212021.csv') as 
 			tf_regulator = tf_regulator_array[index]
 			key = (biclusters[bicluster_name].id, genes[tf_regulator[0]].id)
 			if key not in tf_regulators_dict: # have to add this so we do not add duplicate tf regulator entries
-				regulator_object = TfRegulator( \
-					bicluster_id = biclusters[bicluster_name].id, \
-					tf_id = genes[tf_regulator[0]].id, \
-					r_value = tf_regulator[1], \
-					p_value = tf_regulator[2], \
+				regulator_object = TfRegulator(
+					bicluster_id = biclusters[bicluster_name].id,
+					tf_id = genes[tf_regulator[0]].id,
+					r_value = tf_regulator[1],
+					p_value = tf_regulator[2],
 				)
 				key = (biclusters[bicluster_name].id, genes[tf_regulator[0]].id)
 				tf_regulators_dict[key] = regulator_object
@@ -996,9 +1039,17 @@ with open('data/postProcessed_clustersOfBiclusters_CNA_CNVkit_01212021.csv') as 
 				miRNA_entry = miRNAs[mimat]
 				key = (biclusters[bicluster_name].id, miRNA_entry.id)
 				if key not in mirna_regulators_dict: # have to make sure we don't add duplicate mirna regulator entries
+					p_value = None
+					r_value = None
+					if (bicluster_name, mimat) in mimat_p_values:
+						p_value = mimat_p_values[(bicluster_name, mimat)]
+						r_value = mimat_r_values[(bicluster_name, mimat)]
+					
 					regulator_object = MirnaRegulator(
-						bicluster_id = biclusters[bicluster_name].id, \
-						mirna_id = miRNA_entry.id, \
+						bicluster_id = biclusters[bicluster_name].id,
+						mirna_id = miRNA_entry.id,
+						p_value = p_value,
+						r_value = r_value,
 					)
 					mirna_regulators_dict[key] = regulator_object
 					db.session.add(regulator_object)

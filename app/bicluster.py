@@ -215,7 +215,7 @@ def get_bicluster_info(bicluster, r_cutoff):
 		elements.append({'data': { 'id': 'tfbc%d' % tf[0], 'source': 'reg%d' % tf[0], 'target': 'bc%d' % bc_pk }, 'classes': "N/A Action" })
 
 	c.execute(
-		"""SELECT mirna.id, mirna.name, mr.id
+		"""SELECT mirna.id, mirna.name, mr.id, mr.p_value, mr.r_value
     FROM mirna_regulator mr
     JOIN mirna ON mirna.id = mr.mirna_id
     WHERE mr.bicluster_id = %s;""",
@@ -233,7 +233,7 @@ def get_bicluster_info(bicluster, r_cutoff):
 			if mirna_count != 0:
 				known = 'Yes'
 			
-			regulators.append(['miRNA', mirna[0], mirna[1], 'Repressor', known])
+			regulators.append(['miRNA', mirna[0], mirna[1], 'Repressor', known, mirna[3], mirna[4]])
 			mirnaList.append(mirna[1])
 			elements.append({'data': { 'id': 'reg%d' % mirna[2], 'name': mirna[1]}, 'classes': 'mirna' })
 			elements.append({'data': { 'id': 'mirnabc%d' % mirna[2], 'source': 'reg%d' % mirna[2], 'target': 'bc%d' % bc_pk }, 'classes': 'repressor' })

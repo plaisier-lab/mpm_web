@@ -190,6 +190,8 @@ class MirnaRegulator(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     bicluster_id = db.Column(db.ForeignKey('bicluster.id'), index=True)
     mirna_id = db.Column(db.ForeignKey('mirna.id'), index=True) #   MIMAT[0-9]+
+    p_value = db.Column(db.Float)
+    r_value = db.Column(db.Float)
 
     bicluster = db.relationship('Bicluster', primaryjoin='MirnaRegulator.bicluster_id == Bicluster.id', backref='mirna_regulators')
     mirna = db.relationship('Mirna', primaryjoin='MirnaRegulator.mirna_id == Mirna.id', backref='mirna_regulators')
