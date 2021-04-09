@@ -232,6 +232,9 @@ gene_expression_count = 0
 for patient1 in gexp1.columns:
 	for gene1 in gexp1.index:
 		if gene1 in genes and patient_check.match(patient1):
+			if math.isnan(float(gexp1[patient1][gene1])):
+				continue
+			
 			ge1 = GeneExpression(
 				exp_dataset_id=ed1.id, patient_id=patients[patient1].id, gene_id=genes[int(gene1)].id, value=float(gexp1[patient1][gene1]))
 			db.session.add(ge1)
@@ -378,7 +381,7 @@ with open("data/humanTFs_All.csv") as in_file:
 	in_file.close()
 
 	# open up json file and start figuring out various TFTargets
-	json_file = open("data/tfbsDb_plus_and_minus_5000_entrez.json")
+	json_file = open("data/tfbsDb_plus_and_minus_5000_entrez_03302021.json")
 	json_data = json.loads(json_file.readline())
 	json_file.close()
 
@@ -479,8 +482,8 @@ def handle_miRNA_json(file_name, source_name):
 	print("committing {} miRNA target entries ({}), final commit...".format(entries_made, source_name))
 	db.session.commit()
 
-handle_miRNA_json("targetScan_miRNA_sets_entrez_hsa.json", "Target Scan")
-handle_miRNA_json("pita_miRNA_sets_entrez_hsa.json", "Pita")
+handle_miRNA_json("targetScan_miRNA_sets_entrez_hsa_03302021.json", "Target Scan")
+handle_miRNA_json("pita_miRNA_sets_entrez_hsa_03302021.json", "Pita")
 
 sif_mutation_to_regulators = {} # maps a mutation to an array of regualtors
 sif_regulator_to_mutations = {} # maps a regulator to an array of mutations
@@ -678,7 +681,7 @@ def interpret_causality_summary(filename, bicluster_prefix):
 
 # parse phenotypes
 phenotypes = {}
-with open('data/phenotypes_meso_noFilter.csv') as in_file:
+with open('data/phenotypes_meso_noFilter_03302021.csv') as in_file:
 	# read header
 	header = in_file.readline().split(",")
 	for i in range(1, len(header)):
@@ -789,14 +792,14 @@ def read_miRNA_p_r_values(r_values_file, p_values_file):
 	p_values_file.close()
 
 read_miRNA_p_r_values(
-	"./data/miRNA_cor_mesoTCGA/eig_miR_cor_12112020.csv",
-	"./data/miRNA_cor_mesoTCGA/eig_miR_pv_12112020.csv",
+	"./data/miRNA_cor_mesoTCGA/eig_miR_cor_03302021.csv",
+	"./data/miRNA_cor_mesoTCGA/eig_miR_pv_03302021.csv",
 )
 
 biclusters = {}
 tf_regulators_dict = {}
 mirna_regulators_dict = {}
-with open('data/postProcessed_clustersOfBiclusters_CNA_CNVkit_01212021.csv') as in_file:
+with open('data/postProcessed_clustersOfBiclusters_CNA_CNVkit_03302021.csv') as in_file:
 	# we need to cache the values so we can create the classes in order. we need to do this so the database can automatically complete the relationships defined in models.py
 	bic_gene_values = []
 	bic_go_values = []
@@ -1032,11 +1035,11 @@ with open('data/postProcessed_clustersOfBiclusters_CNA_CNVkit_01212021.csv') as 
 
 
 # handle somatic mutations and causal flows
-interpret_sif("./data/sifs/causalAndMechanistic_network_CNA_CNVkit_01_21_2021.sif")
-interpret_causality_summary("./data/causality_CNA_final_8_13_2019/causalitySummary_pita_12112020.csv", "pita")
-interpret_causality_summary("./data/causality_CNA_final_8_13_2019/causalitySummary_targetscan_12112020.csv", "targetscan")
-interpret_causality_summary("./data/causality_CNA_final_8_13_2019/causalitySummary_tfbs_db_12112020.csv", "tfbs_db")
-interpret_causality_summary("./data/causal_v9/summaryCausality_CNV_11_1_2020_0.3_0.05_cleanedUp_12112020.csv", None)
+interpret_sif("./data/sifs/causalAndMechanistic_network_CNA_CNVkit_03_30_2021.sif")
+interpret_causality_summary("./data/causality_CNA_final_8_13_2019/causalitySummary_pita_03302021.csv", "pita")
+interpret_causality_summary("./data/causality_CNA_final_8_13_2019/causalitySummary_targetscan_03302021.csv", "targetscan")
+interpret_causality_summary("./data/causality_CNA_final_8_13_2019/causalitySummary_tfbs_db_03302021.csv", "tfbs_db")
+interpret_causality_summary("./data/causal_v9/summaryCausality_CNV_03_11_2021_0.3_0.05_cleanedup.csv", None)
 
 with open("./data/oncoMerged_MESO/oncoMerge_mergedMuts_12112020.csv") as file:
 	header = file.readline().split(',')[1:]
@@ -1054,9 +1057,9 @@ with open("./data/oncoMerged_MESO/oncoMerge_mergedMuts_12112020.csv") as file:
 	db.session.commit()
 
 # handle eigengenes
-read_eigengenes("./data/eigengenes/biclusterEigengenes_pita.csv", "pita")
-read_eigengenes("./data/eigengenes/biclusterEigengenes_targetscan.csv", "targetscan")
-read_eigengenes("./data/eigengenes/biclusterEigengenes_tfbs_db.csv", "tfbs_db")
+read_eigengenes("./data/eigengenes/biclusterEigengenes_pita_03302021.csv", "pita")
+read_eigengenes("./data/eigengenes/biclusterEigengenes_targetscan_03302021.csv", "targetscan")
+read_eigengenes("./data/eigengenes/biclusterEigengenes_tfbs_db_03302021.csv", "tfbs_db")
 
 # find bicluster phenotype significances
 for bicluster in biclusters.values():

@@ -30,7 +30,7 @@ from constants import HALLMARKS, SELECTABLE_PHENOTYPES, SELECTABLE_PHENOTYPES_BL
 from database import dbconn
 from bicluster import bicluster_page
 from causal_analysis import causal_analysis_page
-from search import search_page
+from search import search_page, get_index_locals
 from jacks import jacks_page
 
 app = Flask(__name__)
@@ -45,18 +45,6 @@ app.register_blueprint(jacks_page)
 def unhandled_exception(e):
 	app.logger.exception(e)
 	return render_template('unknown_error.html')
-
-def get_index_locals():
-	selectable_phenotypes = [('None', '')]
-	for name, value in SELECTABLE_PHENOTYPES:
-		if value not in SELECTABLE_PHENOTYPES_BLACKLIST:
-			selectable_phenotypes.append((name, value))
-	
-	hallmarks = [('None', '')]
-	for hallmark in HALLMARKS:
-		hallmarks.append((hallmark, hallmark))
-		
-	return [hallmarks, selectable_phenotypes]
 
 @app.route('/')
 def index():

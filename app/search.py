@@ -1,9 +1,22 @@
 import base64
 import json
 
-from constants import HALLMARKS, HALLMARK_TO_ICON
+from constants import HALLMARKS, HALLMARK_TO_ICON, SELECTABLE_PHENOTYPES, SELECTABLE_PHENOTYPES_BLACKLIST
 from database import dbconn
 from flask import Blueprint, render_template, request, redirect, url_for
+
+# define values for advanced search in index.html jinja
+def get_index_locals():
+	selectable_phenotypes = [('None', '')]
+	for name, value in SELECTABLE_PHENOTYPES:
+		if value not in SELECTABLE_PHENOTYPES_BLACKLIST:
+			selectable_phenotypes.append((name, value))
+	
+	hallmarks = [('None', '')]
+	for hallmark in HALLMARKS:
+		hallmarks.append((hallmark, hallmark))
+		
+	return [hallmarks, selectable_phenotypes]
 
 search_page = Blueprint("search_page", __name__, template_folder="templates")
 
@@ -16,7 +29,7 @@ def search():
 	db = dbconn()
 	c = db.cursor()
 	bme_type ='gene'
-	if not gene and phenotype == "None" and hallmark == "None":
+	if not gene and phenotype == None and hallmark == None:
 		hallmarks, selectable_phenotypes = get_index_locals()
 		return render_template('index.html', hallmarks = hallmarks, selectable_phenotypes = selectable_phenotypes, invalid_gene = True)
 
@@ -29,7 +42,7 @@ def search():
 		bme_type = 'mirna'
 	db.close()
 
-	if len(geneData) == 0 and phenotype == "None" and hallmark == "None":
+	if len(geneData) == 0 and phenotype == None and hallmark == None:
 		hallmarks, selectable_phenotypes = get_index_locals()
 		return render_template('index.html', hallmarks = hallmarks, selectable_phenotypes = selectable_phenotypes, invalid_gene = True)
 

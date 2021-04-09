@@ -436,7 +436,7 @@ function loadCausalFlow(mutationName, regulatorName, biclusterName, phenotypeNam
 					tooltip.style("left", `${d3.event.clientX}px`)
 						.style("top", `${d3.event.clientY}px`)
 					
-					tooltip.html(`<b>${d.name}</b><br />Maximum: ${d.high.toFixed(4)}<br />Upper Quartile: ${d.q3.toFixed(4)}<br />Median: ${d.median.toFixed(4)}<br />Loewr Quartile: ${d.q1.toFixed(4)}<br />Minimum: ${d.low.toFixed(4)}`)
+					tooltip.html(`<b>${d.name}</b><br />Maximum: ${d.high.toFixed(4)}<br />Upper Quartile: ${d.q3.toFixed(4)}<br />Median: ${d.median.toFixed(4)}<br />Lower Quartile: ${d.q1.toFixed(4)}<br />Minimum: ${d.low.toFixed(4)}`)
 				})
 				.on("mousemove", d => {
 					tooltip.style("left", `${d3.event.clientX}px`)
