@@ -477,9 +477,9 @@ function loadCausalFlow(mutationName, regulatorName, biclusterName, phenotypeNam
 			yAxisCount++
 		}
 
-		drawBoxplot(json.mutation_gene_expression, 40, 0, `${regulatorName} Mutational Status`, `${regulatorName} Expression`)
-		drawBoxplot(json.bicluster_eigengene_expression, 800, 0, `${regulatorName} Mutational Status`, `${biclusterName} Expression`)
-		drawBoxplot(json.residual, 800, 400, `${regulatorName} Mutational Status`, [`${biclusterName} Expression`, `Conditioned On ${regulatorName} Expression`])
+		drawBoxplot(json.mutation_gene_expression, 40, 0, `${mutationName} Mutational Status`, `${regulatorName} Expression`)
+		drawBoxplot(json.bicluster_eigengene_expression, 800, 0, `${mutationName} Mutational Status`, `${biclusterName} Expression`)
+		drawBoxplot(json.residual, 800, 400, `${mutationName} Mutational Status`, [`${biclusterName} Expression`, `Conditioned On ${regulatorName} Expression`])
 		drawScatterplot(40, 400)
 
 		// handle the middle decorations
