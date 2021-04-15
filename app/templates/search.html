@@ -89,6 +89,21 @@
 	<div class='text-center'>
 		<div class='bs-callout bs-callout-success'>
 			<h3><strong>Searched for: &nbsp;{{ gene }}</strong></h3>
+
+			{% if searched_hallmarks %}
+				<h4 style="display: flex; align-items: center; justify-content: center; color: #600;">
+					<div style="margin-right: 5px;">Biclusters containing</div>
+					{% for hallmark in searched_hallmarks %}
+						<img src='/static/images/{{ hallmark[1] }}' width='20' alt='{{ hallmark[0] }}' title='{{ hallmark[0] }}' style="margin: 2px;">
+					{% endfor %}
+				</h4>
+			{% endif %}
+
+			{% if searched_phenotype %}
+				<h4 style="display: flex; align-items: center; justify-content: center; color: #600;">
+					Searched phenotype: {{ searched_phenotype }}
+				</h4>
+			{% endif %}
 		</div>
 		<div class='bs-callout bs-callout-default'>
 			<h4>{{ gene }} mutations modulate: <span class="glyphicon glyphicon-info-sign" data-toggle='collapse' data-target='#mut' style='color:#f00;font-size=10pt;'></span></h4>

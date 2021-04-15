@@ -21,6 +21,7 @@ function loadCausalFlow(mutationName, regulatorName, biclusterName, phenotypeNam
 	document.getElementById("save-causal-flow").addEventListener("click", event => {
 		saveSvgAsPng(document.getElementById("causal-flow-svg"), `${mutationName}-${regulatorName}-${biclusterName}.png`)
 		saveSvg(document.getElementById("causal-flow-svg"), `${mutationName}-${regulatorName}-${biclusterName}.svg`)
+		console.log("saved")
 	})
 
 	// append the svg object to the body of the page

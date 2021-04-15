@@ -78,10 +78,19 @@
 				<h4 style="display: flex; align-items: center; justify-content: center;">
 					<div style="margin-right: 5px;">Biclusters containing</div>
 					{% for hallmark in searched_hallmarks %}
-						<img src='/static/images/{{ hallmark[1] }}' width='20' alt='{{ hallmark[0] }}' title='{{ hallmark[0] }}'>
+						<img src='/static/images/{{ hallmark[1] }}' width='20' alt='{{ hallmark[0] }}' title='{{ hallmark[0] }}' style="margin: 2px;">
 					{% endfor %}
 				</h4>
 			{% endif %}
+
+			{% if searched_phenotype %}
+				<h4 style="display: flex; align-items: center; justify-content: center;">
+					Searched phenotype: {{ searched_phenotype }}
+				</h4>
+			{% endif %}
+
+			<br />
+
 			<table class='table table-bordered table-striped text-center'>
 			<tr>
 				<th class='text-center'>Biclusters</th>

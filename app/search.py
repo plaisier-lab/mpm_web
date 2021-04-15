@@ -380,7 +380,16 @@ def gene(symbol=None, defaults={'symbol': None}):
 					"phenotype": phenotype_result,
 				})
 	db.close()
-	return render_template('search.html', gene=symbol, mutations=mutations, regulators=regulators, biclusters=biclusters)
+
+	return render_template(
+		"search.html",
+		gene=symbol,
+		mutations=mutations,
+		regulators=regulators,
+		biclusters=biclusters,
+		searched_hallmarks=[(HALLMARKS[i - 1], HALLMARK_TO_ICON[HALLMARKS[i - 1]]) for i in hallmarks],
+		searched_phenotype=phenotype_query
+	)
 
 @search_page.route('/advanced-search')
 def advanced_search():
