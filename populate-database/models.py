@@ -262,6 +262,7 @@ class SomaticMutation(db.Model):
     locus_id = db.Column(db.ForeignKey('locus.id'), index=True)
 
     locus = db.relationship('Locus', primaryjoin='SomaticMutation.locus_id == Locus.id', backref='somatic_mutations')
+    gene = db.relationship('Gene', primaryjoin='SomaticMutation.ext_id == Gene.id', backref='somatic_mutations')
 
     mutation_name = ""
 

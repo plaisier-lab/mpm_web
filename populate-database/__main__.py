@@ -485,199 +485,34 @@ def handle_miRNA_json(file_name, source_name):
 handle_miRNA_json("targetScan_miRNA_sets_entrez_hsa_03302021.json", "Target Scan")
 handle_miRNA_json("pita_miRNA_sets_entrez_hsa_03302021.json", "Pita")
 
-sif_mutation_to_regulators = {} # maps a mutation to an array of regualtors
-sif_regulator_to_mutations = {} # maps a regulator to an array of mutations
-sif_regulator_to_biclusters = {} # maps a regulator to an array of biclusters
-sif_bicluster_to_regulators = {} # maps a bicluster to an array of regulators
-def interpret_sif(filename):
-	file = open(filename)
-	line = file.readline()
-	while line:
-		split = line.split(" ")
-		first = split[0].strip()
-		command = split[1].strip()
-		last = split[2].strip()
-
-		line = file.readline()
-
-		if command == "g2r": # mutation to regulator
-			# first is a mutation
-			# last is a regulator
-			
-			if last not in symbol2entrez and last.lower() not in miRNAIDs:
-				continue
-
-			if last.lower() in miRNAIDs:
-				last = miRNAIDs[last.lower()] # translate readable name to MIMAT
-			else:
-				last = int(symbol2entrez[last])
-			
-			if first not in sif_mutation_to_regulators:
-				sif_mutation_to_regulators[first] = []
-			
-			if last not in sif_regulator_to_mutations:
-				sif_regulator_to_mutations[last] = []
-			
-			sif_mutation_to_regulators[first].append(last)
-			sif_regulator_to_mutations[last].append(first)
-		elif command == "r2b": # regulator to bicluster
-			# first is a regulator
-			# last is a bicluster
-			
-			if first not in symbol2entrez and first.lower() not in miRNAIDs:
-				continue
-
-			if "mir" in first.lower() and first.lower() not in miRNAIDs:
-				print("failed to find mirna " + first + " in the dictionary")
-				continue
-			elif "mir" in first.lower():
-				print("found " + first.lower() + " as " + miRNAIDs[first.lower()])
-			
-			if first.lower() in miRNAIDs:
-				first = miRNAIDs[first.lower()] # translate readable name to MIMAT
-			else:
-				first = int(symbol2entrez[first])
-			
-			if first not in sif_regulator_to_biclusters:
-				sif_regulator_to_biclusters[first] = []
-			
-			if last not in sif_bicluster_to_regulators:
-				sif_bicluster_to_regulators[last] = []
-			
-			sif_regulator_to_biclusters[first].append(last)
-			sif_bicluster_to_regulators[last].append(first)
-	
-	file.close()
-
 somatic_mutations = {}
 locus_map = {}
 locus_array = []
 '''
 this might get the causal_flow structure
 
-SELECT CONCAT_WS(
-		'',
-		CONCAT(l.locus_name, '_', l.mutation_type),
-		CONCAT(g2.entrez, '_', sm.mutation_type)
-	) AS mutation,
-	g.symbol AS regulator,
-	b.name AS bicluster
+SELECT cf.id AS id,
+CONCAT_WS(
+	'',
+	CONCAT(l.locus_name, '_', l.mutation_type),
+	CONCAT(g2.entrez, '_', sm.mutation_type)
+) AS mutation,
+CONCAT_WS(
+	'',
+	g.symbol,
+	m.mature_seq_id
+) AS regulator,
+b.name AS bicluster
 FROM causal_flow cf
 	JOIN bicluster b ON cf.bicluster_id=b.id
-	JOIN tf_regulator tf ON cf.regulator_id=tf.id
-	JOIN gene g ON tf.tf_id=g.id 
 	JOIN somatic_mutation sm ON cf.somatic_mutation_id=sm.id
 	LEFT JOIN gene g2 ON sm.ext_id=g2.id
-	LEFT JOIN locus l ON sm.locus_id=l.id;
+	LEFT JOIN locus l ON sm.locus_id=l.id
+	LEFT JOIN tf_regulator tf ON cf.regulator_id=tf.id AND cf.regulator_type="tf"
+	LEFT JOIN gene g ON tf.tf_id=g.id  AND cf.regulator_type="tf"
+	LEFT JOIN mirna_regulator mr ON cf.regulator_id=mr.id AND cf.regulator_type="mirna"
+	LEFT JOIN mirna m ON mr.mirna_id=m.id AND cf.regulator_type="mirna";
 '''
-def interpret_causality_summary(filename, bicluster_prefix):
-	file = open(filename)
-	header = file.readline() # absorb the header
-
-	mimat_regex = re.compile(r'^MIMAT')
-	bicluster_number_regex = re.compile(r'[0-9]+')
-	bicluster_prefix_regex = re.compile(r'^[A-Za-z_]+(?=_)')
-
-	for line in file:
-		split = [line.strip() for line in line.split(",")]
-
-		# mutations
-		mutation = parse_mutation_name(split[0]) # parse TF mutation
-		is_locus = False
-		if mutation == None: # parse locus
-			mutation = parse_locus_name(split[0])
-			sif_mutation_name = mutation
-			is_locus = True
-		else:
-			sif_mutation_name = "{}_{}".format(entrez2symbol[str(mutation[0])], mutation[1])
-
-		mutation_name = "{}_{}".format(mutation[0], mutation[1])
-
-		# regulators
-		entrez_or_mimat = split[1]
-		regulator = ""
-		if mimat_regex.match(entrez_or_mimat):
-			regulator = entrez_or_mimat # MIMAT#######
-		else:
-			regulator = int(split[1]) # entrez id
-
-		# biclusters		
-		bicluster = int(bicluster_number_regex.findall(split[2])[0]) # digits at end of bicluster name
-		# some files have bicluster prefixes, so we need to account for that
-		if bicluster_prefix_regex.match(split[2]):
-			bicluster_prefix = bicluster_prefix_regex.match(split[2]).group(0)
-		bicluster_name = "{}_{}".format(bicluster_prefix, bicluster)
-		
-		leo_nb_atob = float(split[3])
-		mlogp_m_atob = float(split[5])
-
-		if (
-			( # check mutation -> regulator edge
-				sif_mutation_name in sif_mutation_to_regulators
-				and regulator in sif_mutation_to_regulators[sif_mutation_name]
-			)
-			and ( # check regulator -> bicluster
-				regulator in sif_regulator_to_biclusters
-				and bicluster_name in sif_regulator_to_biclusters[regulator]
-			)
-		):
-			bicluster_id = biclusters[bicluster_name].id
-			regulator_id = ""
-			regulator_type = ""
-
-			# determine regulator type
-			if regulator in genes:
-				regulator_key = (bicluster_id, genes[regulator].id)
-
-				if regulator_key not in tf_regulators_dict:
-					continue
-
-				regulator_id = tf_regulators_dict[regulator_key].id
-				regulator_type = "tf"
-			elif regulator in miRNAs:
-				regulator_key = (bicluster_id, miRNAs[regulator].id)
-
-				if regulator_key not in mirna_regulators_dict:
-					continue
-
-				regulator_id = mirna_regulators_dict[regulator_key].id
-				regulator_type = "mirna"
-			
-			# create somatic mutation if we don't have one
-			if mutation[0] in genes and is_locus == False and mutation_name not in somatic_mutations:
-				somatic_mutations[mutation_name] = SomaticMutation(
-					ext_id = genes[mutation[0]].id,
-					mutation_type = mutation[1], # PAM, LoF, etc
-					mutation_name = mutation_name,
-				)
-				db.session.add(somatic_mutations[mutation_name])
-			# create locus and somatic mmutation if we don't have one
-			elif is_locus == True and mutation_name not in locus_map and mutation_name not in somatic_mutations:
-				locus_map[mutation_name] = Locus(
-					locus_name = mutation[0],
-					mutation_type = mutation[1],
-				)
-				db.session.add(locus_map[mutation_name])
-
-				somatic_mutations[mutation_name] = SomaticMutation(
-					locus = locus_map[mutation_name],
-					mutation_name = mutation_name,
-				)
-				db.session.add(somatic_mutations[mutation_name])
-			elif mutation_name not in somatic_mutations: # quit if we can't find a somatic mutation
-				continue
-			
-			# create causal flow
-			causal_flow = CausalFlow(
-				somatic_mutation = somatic_mutations[mutation_name],
-				regulator_id = regulator_id,
-				regulator_type = regulator_type,
-				bicluster_id = bicluster_id,
-				leo_nb_atob = leo_nb_atob,
-				mlogp_m_atob = mlogp_m_atob,
-			)
-			db.session.add(causal_flow)
-	db.session.commit()
 
 # parse phenotypes
 phenotypes = {}
@@ -1035,11 +870,96 @@ with open('data/postProcessed_clustersOfBiclusters_CNA_CNVkit_03302021.csv') as 
 
 
 # handle somatic mutations and causal flows
-interpret_sif("./data/sifs/causalAndMechanistic_network_CNA_CNVkit_03_30_2021.sif")
-interpret_causality_summary("./data/causality_CNA_final_8_13_2019/causalitySummary_pita_03302021.csv", "pita")
-interpret_causality_summary("./data/causality_CNA_final_8_13_2019/causalitySummary_targetscan_03302021.csv", "targetscan")
-interpret_causality_summary("./data/causality_CNA_final_8_13_2019/causalitySummary_tfbs_db_03302021.csv", "tfbs_db")
-interpret_causality_summary("./data/causal_v9/summaryCausality_CNV_03_11_2021_0.3_0.05_cleanedup.csv", None)
+tf_frame = pd.read_csv("./data/causal_v9/forWebsite_causality.csv", header=0, index_col=0)
+mirna_frame = pd.read_csv("./data/causal_v9/forWebsite_causality_miRNA.csv", header=0, index_col=0)
+frame = pd.concat([tf_frame, mirna_frame], axis=0)
+
+for i in range(0, len(frame)):
+	mutation = frame.iloc[i]["Mutation"]
+	regulator = frame.iloc[i]["Regulator"]
+	bicluster = frame.iloc[i]["Bicluster"]
+	leo_nb_atob = frame.iloc[i]["leo.nb.AtoB"]
+	mlogp_m_atob = frame.iloc[i]["mlogp.M.AtoB"]
+
+	# find bicluster id
+	bicluster_id = biclusters[bicluster].id
+
+	# classify mutation as TF or locus
+	parsed_mutation = parse_mutation_name(mutation) # parse TF mutation
+	is_locus = False
+	if parsed_mutation == None: # parse locus
+		parsed_mutation = parse_locus_name(mutation)
+		is_locus = True
+
+	parsed_mutation_name = "{}_{}".format(parsed_mutation[0], parsed_mutation[1])
+
+	# create somatic mutation if we don't have one
+	if is_locus == False and parsed_mutation_name not in somatic_mutations:
+		if parsed_mutation[0] not in genes:
+			gene = Gene(symbol=entrez2symbol[str(parsed_mutation[0])], entrez=int(parsed_mutation[0]))
+			db.session.add(gene)
+			genes[int(parsed_mutation[0])] = gene
+			print("created gene {}".format(entrez2symbol[str(parsed_mutation[0])]))
+		
+		somatic_mutations[parsed_mutation_name] = SomaticMutation(
+			gene = genes[parsed_mutation[0]],
+			mutation_type = parsed_mutation[1], # PAM, LoF, etc
+			mutation_name = parsed_mutation_name,
+		)
+		db.session.add(somatic_mutations[parsed_mutation_name])
+	# create locus and somatic mmutation if we don't have one
+	elif is_locus == True and parsed_mutation_name not in locus_map and parsed_mutation_name not in somatic_mutations:
+		locus_map[parsed_mutation_name] = Locus(
+			locus_name = parsed_mutation[0],
+			mutation_type = parsed_mutation[1],
+		)
+		db.session.add(locus_map[parsed_mutation_name])
+
+		somatic_mutations[parsed_mutation_name] = SomaticMutation(
+			locus = locus_map[parsed_mutation_name],
+			mutation_name = parsed_mutation_name,
+		)
+		db.session.add(somatic_mutations[parsed_mutation_name])
+	elif parsed_mutation_name not in somatic_mutations: # quit if we can't find a somatic mutation
+		print("causal flow: somehow could not find mutation {}".format(parsed_mutation_name))
+		continue
+
+	# parse the regulator information, find a suitable regulator id
+	regulator_id = None
+	regulator_key = None
+	if type(regulator) == int and regulator in genes:
+		regulator_key = (bicluster_id, genes[regulator].id)
+
+		if regulator_key not in tf_regulators_dict:
+			printf("causal flows: could not find regulator {} linked to bicluster {}".format(int(regulator), bicluster))
+			continue
+		
+		regulator_id = tf_regulators_dict[regulator_key].id
+		regulator_type = "tf"
+	elif regulator in miRNAs:
+		regulator_key = (bicluster_id, miRNAs[regulator].id)
+
+		if regulator_key not in mirna_regulators_dict:
+			printf("causal flows: could not find regulator {} linked to bicluster {}".format(regulator, bicluster))
+			continue
+
+		regulator_id = mirna_regulators_dict[regulator_key].id
+		regulator_type = "mirna"
+	else: # couldn't find either TF or miRNA
+		printf("causal flow: could not find regulator {}".format(regulator))
+		continue
+	
+	causal_flow = CausalFlow(
+		somatic_mutation = somatic_mutations[parsed_mutation_name],
+		regulator_id = regulator_id,
+		regulator_type = regulator_type,
+		bicluster_id = bicluster_id,
+		leo_nb_atob = leo_nb_atob,
+		mlogp_m_atob = mlogp_m_atob,
+	)
+	db.session.add(causal_flow)
+
+db.session.commit()
 
 with open("./data/oncoMerged_MESO/oncoMerge_mergedMuts_12112020.csv") as file:
 	header = file.readline().split(',')[1:]
